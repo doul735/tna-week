@@ -703,7 +703,7 @@ tr:hover td { background: rgba(245,166,35,.04); }
       <select id="tna-sel-store" style="height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px;padding:0 12px;cursor:pointer;outline:none;min-width:140px">
         <option value="ALL">전체 매장</option>
       </select>
-      <button class="btn btn-primary" onclick="renderTna()" style="height:36px;padding:0 16px;font-size:13px">조회</button>
+      <button class="btn btn-primary" onclick="refreshTnaAndRender()" style="height:36px;padding:0 16px;font-size:13px">최신 조회</button>
       <button class="btn btn-ghost" onclick="downloadTnaExcel()" style="height:36px;padding:0 14px;font-size:13px;border:1px solid var(--border)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         엑셀 다운로드
@@ -739,7 +739,7 @@ tr:hover td { background: rgba(245,166,35,.04); }
     <div class="section-title" style="display:flex;align-items:center;gap:8px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> 매장별 월간 상세 현황</div>
     <div class="table-wrap" style="overflow-x:auto">
       <div class="table-header">
-        <div class="table-title">2026년 타이어앤 판매 현황</div>
+        <div class="table-title" id="tna-table-title">타이어앤 판매 현황</div>
         <button class="download-btn" onclick="downloadTnaExcel()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           엑셀 저장
@@ -1268,7 +1268,7 @@ async function loadFromGoogleSheets() {
 
 
 // ─── 타이어앤 판매 데이터 ─────────────────────────────────────────
-const TNA = {"stores":[{"store":"방배점","monthly":{"1":{"qty":12,"amt":1347720},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":1370160},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":16,"total_amt":2717880},{"store":"서초점","monthly":{"1":{"qty":4,"amt":424040},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":424040},{"store":"광교점","monthly":{"1":{"qty":4,"amt":477840},"2":{"qty":4,"amt":1137840},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":24,"amt":4447080},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":32,"total_amt":6062760},{"store":"대전서구점","monthly":{"1":{"qty":4,"amt":501600},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":8,"amt":1045440},"5":{"qty":2,"amt":231000},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":14,"total_amt":1778040},{"store":"송천점","monthly":{"1":{"qty":12,"amt":1515360},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":599280},"4":{"qty":10,"amt":1389960},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":26,"total_amt":3504600},{"store":"서세종점","monthly":{"1":{"qty":12,"amt":1599200},"2":{"qty":12,"amt":1386000},"3":{"qty":12,"amt":1424280},"4":{"qty":0,"amt":0},"5":{"qty":2,"amt":226040},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":38,"total_amt":4635520},{"store":"대전점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":454080},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":454080},{"store":"한남점","monthly":{"1":{"qty":16,"amt":1935120},"2":{"qty":4,"amt":747120},"3":{"qty":0,"amt":0},"4":{"qty":2,"amt":336600},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":22,"total_amt":3018840},{"store":"홈플러스송도점","monthly":{"1":{"qty":6,"amt":728640},"2":{"qty":8,"amt":799920},"3":{"qty":0,"amt":0},"4":{"qty":2,"amt":289080},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":16,"total_amt":1817640},{"store":"구리점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":543840},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":543840},{"store":"남대구IC점","monthly":{"1":{"qty":4,"amt":567600},"2":{"qty":2,"amt":184800},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":462000},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1214400},{"store":"수성점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"부산거제점","monthly":{"1":{"qty":6,"amt":918720},"2":{"qty":4,"amt":448800},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1367520},{"store":"오창점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"전주역점","monthly":{"1":{"qty":12,"amt":1401840},"2":{"qty":4,"amt":520080},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":634920},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":20,"total_amt":2556840},{"store":"구로점","monthly":{"1":{"qty":6,"amt":904520},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":264000},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1168520},{"store":"부산수영점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"관양점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":2,"amt":450120},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":2,"total_amt":450120},{"store":"평택지산점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0}],"monthly":{"1":{"qty":98,"amt":1232},"2":{"qty":38,"amt":522},"3":{"qty":28,"amt":411},"4":{"qty":22,"amt":306},"5":{"qty":42,"amt":700},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}}};
+let TNA = {"stores":[{"store":"방배점","monthly":{"1":{"qty":12,"amt":1347720},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":1370160},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":16,"total_amt":2717880},{"store":"서초점","monthly":{"1":{"qty":4,"amt":424040},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":424040},{"store":"광교점","monthly":{"1":{"qty":4,"amt":477840},"2":{"qty":4,"amt":1137840},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":24,"amt":4447080},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":32,"total_amt":6062760},{"store":"대전서구점","monthly":{"1":{"qty":4,"amt":501600},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":8,"amt":1045440},"5":{"qty":2,"amt":231000},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":14,"total_amt":1778040},{"store":"송천점","monthly":{"1":{"qty":12,"amt":1515360},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":599280},"4":{"qty":10,"amt":1389960},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":26,"total_amt":3504600},{"store":"서세종점","monthly":{"1":{"qty":12,"amt":1599200},"2":{"qty":12,"amt":1386000},"3":{"qty":12,"amt":1424280},"4":{"qty":0,"amt":0},"5":{"qty":2,"amt":226040},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":38,"total_amt":4635520},{"store":"대전점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":454080},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":454080},{"store":"한남점","monthly":{"1":{"qty":16,"amt":1935120},"2":{"qty":4,"amt":747120},"3":{"qty":0,"amt":0},"4":{"qty":2,"amt":336600},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":22,"total_amt":3018840},{"store":"홈플러스송도점","monthly":{"1":{"qty":6,"amt":728640},"2":{"qty":8,"amt":799920},"3":{"qty":0,"amt":0},"4":{"qty":2,"amt":289080},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":16,"total_amt":1817640},{"store":"구리점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":543840},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":4,"total_amt":543840},{"store":"남대구IC점","monthly":{"1":{"qty":4,"amt":567600},"2":{"qty":2,"amt":184800},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":462000},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1214400},{"store":"수성점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"부산거제점","monthly":{"1":{"qty":6,"amt":918720},"2":{"qty":4,"amt":448800},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1367520},{"store":"오창점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"전주역점","monthly":{"1":{"qty":12,"amt":1401840},"2":{"qty":4,"amt":520080},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":4,"amt":634920},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":20,"total_amt":2556840},{"store":"구로점","monthly":{"1":{"qty":6,"amt":904520},"2":{"qty":0,"amt":0},"3":{"qty":4,"amt":264000},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":10,"total_amt":1168520},{"store":"부산수영점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0},{"store":"관양점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":2,"amt":450120},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":2,"total_amt":450120},{"store":"평택지산점","monthly":{"1":{"qty":0,"amt":0},"2":{"qty":0,"amt":0},"3":{"qty":0,"amt":0},"4":{"qty":0,"amt":0},"5":{"qty":0,"amt":0},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}},"total_qty":0,"total_amt":0}],"monthly":{"1":{"qty":98,"amt":1232},"2":{"qty":38,"amt":522},"3":{"qty":28,"amt":411},"4":{"qty":22,"amt":306},"5":{"qty":42,"amt":700},"6":{"qty":0,"amt":0},"7":{"qty":0,"amt":0},"8":{"qty":0,"amt":0},"9":{"qty":0,"amt":0},"10":{"qty":0,"amt":0},"11":{"qty":0,"amt":0},"12":{"qty":0,"amt":0}}};
 
 // 타이어앤 매장 셀렉트 초기화
 function initTnaSelects() {
@@ -1282,6 +1282,15 @@ function initTnaSelects() {
     sel.appendChild(o);
   });
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+
+  const selYear = document.getElementById('tna-sel-year');
+  if (selYear && !selYear.dataset.bound) {
+    selYear.dataset.bound = '1';
+    selYear.addEventListener('change', () => {
+      rebuildTnaFromLiveRows();
+      renderTna();
+    });
+  }
 }
 
 let tnaCharts = {};
@@ -1296,8 +1305,8 @@ function buildTnaFromRows(rows) {
     const yr = Number(r.yr ?? r['년'] ?? 0);
     const mo = Number(r.mo ?? r['월'] ?? 0);
     const store = String(r.store ?? r['매장명'] ?? '').trim();
-    const qty = Number(String(r.qty ?? r['판매개수'] ?? 0).replace(/,/g,'')) || 0;
-    const amt = Number(String(r.amount ?? r['판매금액'] ?? 0).replace(/,/g,'')) || 0;
+    const qty = Number(String(r.qty ?? r['판매개수'] ?? r['판매갯수'] ?? r['판매수량'] ?? 0).replace(/,/g,'')) || 0;
+    const amt = Number(String(r.amount ?? r.amt ?? r['판매금액'] ?? r['판매 금액'] ?? 0).replace(/,/g,'')) || 0;
 
     if (!yr || !mo || !store) return;
     if (!byStore[store]) {
@@ -1319,21 +1328,91 @@ function buildTnaFromRows(rows) {
   };
 }
 
+let TNA_LIVE_ROWS = [];
+
+function updateTnaYearSelectFromRows(rows) {
+  const selYear = document.getElementById('tna-sel-year');
+  if (!selYear || !Array.isArray(rows) || rows.length === 0) return;
+
+  const years = [...new Set(rows.map(r => Number(r.yr ?? r['년'] ?? 0)).filter(Boolean))]
+    .sort((a, b) => b - a);
+
+  if (!years.length) return;
+
+  const prev = selYear.value;
+  selYear.innerHTML = '';
+  years.forEach(yr => {
+    const o = document.createElement('option');
+    o.value = String(yr);
+    o.textContent = yr + '년';
+    selYear.appendChild(o);
+  });
+
+  if (years.map(String).includes(prev)) {
+    selYear.value = prev;
+  } else {
+    selYear.value = String(years[0]);
+  }
+}
+
+function getTnaSelectedYear() {
+  const selYear = document.getElementById('tna-sel-year');
+  return Number(selYear && selYear.value ? selYear.value : 2026);
+}
+
+function rebuildTnaFromLiveRows() {
+  const selectedYear = getTnaSelectedYear();
+  const filteredRows = Array.isArray(TNA_LIVE_ROWS) && TNA_LIVE_ROWS.length
+    ? TNA_LIVE_ROWS.filter(r => Number(r.yr ?? r['년'] ?? 0) === selectedYear)
+    : [];
+
+  if (filteredRows.length) {
+    const next = buildTnaFromRows(filteredRows);
+    TNA.stores = next.stores;
+    TNA.monthly = next.monthly;
+  }
+
+  initTnaSelects();
+}
+
 async function loadTnaFromGoogleSheets() {
   if (!TIRE_DATA_URL) return false;
   try {
     const res = await fetch(cacheBustUrl(TIRE_DATA_URL));
     if (!res.ok) throw new Error('타이어앤 데이터 요청 실패: ' + res.status);
+
     const rows = await res.json();
-    if (!Array.isArray(rows)) throw new Error(rows && rows.error ? rows.error : '타이어앤 데이터 형식 오류');
-    const next = buildTnaFromRows(rows);
-    TNA.stores = next.stores;
-    TNA.monthly = next.monthly;
+    if (!Array.isArray(rows)) {
+      throw new Error(rows && rows.error ? rows.error : '타이어앤 데이터 형식 오류');
+    }
+
+    TNA_LIVE_ROWS = rows;
+    updateTnaYearSelectFromRows(rows);
+    rebuildTnaFromLiveRows();
+
     console.log('타이어앤 데이터 연동 완료:', TNA.stores.length, '개 매장');
     return true;
   } catch(e) {
     console.warn('타이어앤 구글 시트 연동 실패, 내장 데이터 사용:', e);
     return false;
+  }
+}
+
+async function refreshTnaAndRender() {
+  const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().includes('최신 조회'));
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '불러오는 중...';
+  }
+
+  await loadTnaFromGoogleSheets();
+  initTnaSelects();
+  renderTna();
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = originalText || '최신 조회';
   }
 }
 
@@ -1347,6 +1426,9 @@ function renderTna() {
   const stores = getTnaStores();
   const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
   const MO_LBL = MONTHS.map(m => m+'월');
+  const selectedYear = getTnaSelectedYear();
+  const tableTitle = document.getElementById('tna-table-title');
+  if (tableTitle) tableTitle.textContent = selectedYear + '년 타이어앤 판매 현황';
 
   // ── KPI 카드 ──
   const totalQty = stores.reduce((s,d)=>s+d.total_qty,0);
@@ -1357,8 +1439,8 @@ function renderTna() {
   const topStore = [...stores].sort((a,b)=>b.total_qty-a.total_qty)[0];
 
   document.getElementById('tna-kpi-grid').innerHTML = [
-    {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`, label:'총 판매 수량', val: totalQty.toLocaleString()+'개', sub:'2026년 누적', cls:'conn'},
-    {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`, label:'총 판매 금액', val: amtMan.toLocaleString()+'만원', sub:'2026년 누적', cls:'views'},
+    {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`, label:'총 판매 수량', val: totalQty.toLocaleString()+'개', sub:getTnaSelectedYear()+'년 누적', cls:'conn'},
+    {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`, label:'총 판매 금액', val: amtMan.toLocaleString()+'만원', sub:getTnaSelectedYear()+'년 누적', cls:'views'},
     {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`, label:'월 평균 판매', val: avgQty.toLocaleString()+'개', sub:'데이터 있는 월 기준', cls:'resin'},
     {icon:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 21 12 17 16 21"/><line x1="12" y1="17" x2="12" y2="12"/><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 4c0 0-3 0-3 3s3 3 3 3"/><path d="M17 4c0 0 3 0 3 3s-3 3-3 3"/></svg>`, label:'최다 판매 매장', val: topStore?.store||'—', sub: (topStore?.total_qty||0)+'개', cls:'review'},
   ].map(c=>`<div class="kpi-card ${c.cls}">
@@ -1530,7 +1612,7 @@ function downloadTnaExcel() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, '타이어앤_판매집계');
-  XLSX.writeFile(wb, '티스테이션_타이어앤_판매현황_2026.xlsx');
+  XLSX.writeFile(wb, `티스테이션_타이어앤_판매현황_${getTnaSelectedYear()}년.xlsx`);
 }
 
 
