@@ -445,3 +445,124 @@ tr:hover td { background: rgba(245,166,35,.04); }
   .kpi-grid { grid-template-columns: 1fr; }
   .kpi-value { font-size: 34px; }
 }
+/* ===== KPI 카드 가독성 개선 ===== */
+
+.kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)) !important;
+  gap: 22px !important;
+  margin-bottom: 34px !important;
+}
+
+.kpi-card {
+  min-height: 190px !important;
+  padding: 28px 30px 24px !important;
+  border-radius: 16px !important;
+  cursor: pointer;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(0,0,0,.28);
+}
+
+.kpi-card::before {
+  height: 4px !important;
+}
+
+.kpi-label {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--text2) !important;
+  margin-bottom: 16px !important;
+}
+
+.kpi-value {
+  font-size: 56px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  margin-bottom: 22px !important;
+}
+
+.kpi-compare {
+  gap: 10px !important;
+}
+
+.kpi-compare-row {
+  font-size: 15px !important;
+}
+
+.compare-label {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.compare-val {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: var(--text) !important;
+}
+
+.compare-delta {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  padding: 3px 8px !important;
+}
+
+.rate-row {
+  gap: 12px !important;
+  margin-top: 16px !important;
+}
+
+.rate-item {
+  font-size: 14px !important;
+}
+
+.rate-item .rl {
+  font-size: 13px !important;
+}
+
+.rate-item .rv {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+.kpi-group-badge {
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+}
+
+.kpi-group-score {
+  font-size: 14px !important;
+}
+
+.kpi-group-score .score-num {
+  font-size: 28px !important;
+  font-weight: 900 !important;
+}
+
+/* 카드 클릭 안내 */
+.kpi-card::after {
+  content: '클릭하여 자세히 보기';
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* 모바일 */
+@media (max-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kpi-card {
+    min-height: 170px !important;
+    padding: 24px 22px 22px !important;
+  }
+
+  .kpi-value {
+    font-size: 46px !important;
+  }
+}
