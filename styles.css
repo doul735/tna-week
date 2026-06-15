@@ -566,3 +566,102 @@ tr:hover td { background: rgba(245,166,35,.04); }
     font-size: 46px !important;
   }
 }
+/* ===== KPI 상세 모달 ===== */
+
+.kpi-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.kpi-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.kpi-modal-panel {
+  position: relative;
+  width: min(900px, calc(100vw - 32px));
+  margin: 70px auto;
+  background: #121722;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 34px;
+  z-index: 2;
+  box-shadow: 0 28px 70px rgba(0,0,0,.45);
+}
+
+.kpi-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface3);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kpi-modal-title {
+  font-size: 30px;
+  font-weight: 900;
+  margin-bottom: 18px;
+}
+
+.kpi-modal-value {
+  font-size: 78px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 28px;
+}
+
+.kpi-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.kpi-modal-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.kpi-modal-box .box-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+
+.kpi-modal-box .box-value {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+@media (max-width: 700px) {
+  .kpi-modal-panel {
+    margin: 28px auto;
+    padding: 24px;
+  }
+
+  .kpi-modal-title {
+    font-size: 24px;
+  }
+
+  .kpi-modal-value {
+    font-size: 56px;
+  }
+
+  .kpi-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
