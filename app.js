@@ -1290,14 +1290,25 @@ async function init() {
 
 init();
 function openKpiModal(data) {
-  document.getElementById('kpiModalTitle').textContent = data.title || '-';
-  document.getElementById('kpiModalValue').textContent = data.current || '-';
-  document.getElementById('kpiModalPrevMonth').textContent = data.prevMonth || '-';
-  document.getElementById('kpiModalPrevYear').textContent = data.prevYear || '-';
-  document.getElementById('kpiModalDeltaMonth').textContent = data.deltaMonth || '-';
-  document.getElementById('kpiModalDeltaYear').textContent = data.deltaYear || '-';
+  const modal = document.getElementById('kpiModal');
+  if (!modal) {
+    console.warn('kpiModal 요소가 없습니다. index.html에 모달 HTML을 추가했는지 확인하세요.');
+    return;
+  }
 
-  document.getElementById('kpiModal').style.display = 'block';
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '-';
+  };
+
+  setText('kpiModalTitle', data.title);
+  setText('kpiModalValue', data.current);
+  setText('kpiModalPrevMonth', data.prevMonth);
+  setText('kpiModalPrevYear', data.prevYear);
+  setText('kpiModalDeltaMonth', data.deltaMonth);
+  setText('kpiModalDeltaYear', data.deltaYear);
+
+  modal.style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
 
@@ -1309,38 +1320,59 @@ function closeKpiModal() {
   document.body.style.overflow = '';
 }
 
-function bindKpiCardEvents() {
-  const cards = document.querySelectorAll('#kpi-grid .kpi-card');
+function setupKpiModalEvents() {
+  const grid = document.getElementById('kpi-grid');
+  if (!grid) return;
 
-  cards.forEach(card => {
-    card.onclick = function () {
-      const title = card.querySelector('.kpi-label')?.textContent?.trim() || '-';
-      const current = card.querySelector('.kpi-value')?.textContent?.trim() || '-';
+  // 중복 바인딩 방지
+  if (grid.dataset.modalBound === '1') return;
+  grid.dataset.modalBound = '1';
 
-      const rows = [...card.querySelectorAll('.kpi-compare-row')];
+  // 카드가 새로 그려져도 계속 작동하도록 이벤트 위임 방식 사용
+  grid.addEventListener('click', function (e) {
+    const card = e.target.closest('.kpi-card');
+    if (!card || !grid.contains(card)) return;
 
-      const prevMonth = rows[0]?.querySelector('.compare-val')?.textContent?.trim() || '-';
-      const prevYear = rows[1]?.querySelector('.compare-val')?.textContent?.trim() || '-';
+    const title = card.querySelector('.kpi-label')?.textContent?.trim() || '-';
+    const current = card.querySelector('.kpi-value')?.textContent?.trim() || '-';
 
-      const rates = [...card.querySelectorAll('.rate-item .rv')];
+    const compareRows = [...card.querySelectorAll('.kpi-compare-row')];
 
-      const deltaMonth = rates[0]?.textContent?.trim() || '-';
-      const deltaYear = rates[1]?.textContent?.trim() || '-';
+    const prevMonth = compareRows[0]?.querySelector('.compare-val')?.textContent?.trim() || '-';
+    const prevYear = compareRows[1]?.querySelector('.compare-val')?.textContent?.trim() || '-';
 
-      openKpiModal({
-        title,
-        current,
-        prevMonth,
-        prevYear,
-        deltaMonth,
-        deltaYear
-      });
-    };
+    const deltaMonth =
+      compareRows[0]?.querySelector('.rv')?.textContent?.trim()
+      || card.querySelectorAll('.rate-row .rv')[0]?.textContent?.trim()
+      || '-';
+
+    const deltaYear =
+      compareRows[1]?.querySelector('.rv')?.textContent?.trim()
+      || card.querySelectorAll('.rate-row .rv')[1]?.textContent?.trim()
+      || '-';
+
+    openKpiModal({
+      title,
+      current,
+      prevMonth,
+      prevYear,
+      deltaMonth,
+      deltaYear
+    });
   });
-}
 
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') {
-    closeKpiModal();
+  const modal = document.getElementById('kpiModal');
+  if (modal && modal.dataset.bgBound !== '1') {
+    modal.dataset.bgBound = '1';
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeKpiModal();
+    });
   }
-});
+
+  if (!document.body.dataset.kpiEscBound) {
+    document.body.dataset.kpiEscBound = '1';
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeKpiModal();
+    });
+  }
+}
