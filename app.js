@@ -1289,3 +1289,58 @@ async function init() {
 }
 
 init();
+function openKpiModal(data) {
+  document.getElementById('kpiModalTitle').textContent = data.title || '-';
+  document.getElementById('kpiModalValue').textContent = data.current || '-';
+  document.getElementById('kpiModalPrevMonth').textContent = data.prevMonth || '-';
+  document.getElementById('kpiModalPrevYear').textContent = data.prevYear || '-';
+  document.getElementById('kpiModalDeltaMonth').textContent = data.deltaMonth || '-';
+  document.getElementById('kpiModalDeltaYear').textContent = data.deltaYear || '-';
+
+  document.getElementById('kpiModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeKpiModal() {
+  const modal = document.getElementById('kpiModal');
+  if (!modal) return;
+
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function bindKpiCardEvents() {
+  const cards = document.querySelectorAll('#kpi-grid .kpi-card');
+
+  cards.forEach(card => {
+    card.onclick = function () {
+      const title = card.querySelector('.kpi-label')?.textContent?.trim() || '-';
+      const current = card.querySelector('.kpi-value')?.textContent?.trim() || '-';
+
+      const rows = [...card.querySelectorAll('.kpi-compare-row')];
+
+      const prevMonth = rows[0]?.querySelector('.compare-val')?.textContent?.trim() || '-';
+      const prevYear = rows[1]?.querySelector('.compare-val')?.textContent?.trim() || '-';
+
+      const rates = [...card.querySelectorAll('.rate-item .rv')];
+
+      const deltaMonth = rates[0]?.textContent?.trim() || '-';
+      const deltaYear = rates[1]?.textContent?.trim() || '-';
+
+      openKpiModal({
+        title,
+        current,
+        prevMonth,
+        prevYear,
+        deltaMonth,
+        deltaYear
+      });
+    };
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    closeKpiModal();
+  }
+});
