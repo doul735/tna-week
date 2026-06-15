@@ -307,7 +307,40 @@
   </div>
 
 </main>
+<!-- KPI 카드 확대 모달 -->
+<div id="kpiModal" class="kpi-modal">
+  <div class="kpi-modal-box">
+    <button class="kpi-modal-close" onclick="closeKpiModal()">×</button>
 
+    <div class="kpi-modal-label">선택 지표</div>
+    <h2 id="kpiModalTitle">-</h2>
+
+    <div id="kpiModalValue" class="kpi-modal-value">-</div>
+
+    <div class="kpi-modal-grid">
+      <div>
+        <span>전월 동기</span>
+        <strong id="kpiModalPrevMonth">-</strong>
+      </div>
+      <div>
+        <span>전년 동기</span>
+        <strong id="kpiModalPrevYear">-</strong>
+      </div>
+      <div>
+        <span>전월 증감</span>
+        <strong id="kpiModalDeltaMonth">-</strong>
+      </div>
+      <div>
+        <span>전년 증감</span>
+        <strong id="kpiModalDeltaYear">-</strong>
+      </div>
+    </div>
+
+    <p class="kpi-modal-desc">
+      선택한 KPI의 현재값과 전월·전년 동기 대비 변화를 크게 확인할 수 있습니다.
+    </p>
+  </div>
+</div>
 <script src="./app.js"></script>
 </body>
 </html>
