@@ -463,11 +463,12 @@ function applyFilter() {
   const prevMoSum = pmKey ? sumRows(getRows(pmKey.yr, pmKey.mo, pmKey.wk, store, team)) : null;
   const prevYrSum = pyKey ? sumRows(getRows(pyKey.yr, pyKey.mo, pyKey.wk, store, team)) : null;
 
-  renderPeriodHeader(yr, mo, wk);
-  renderKPI(curSum, prevMoSum, prevYrSum);
-  renderCharts(curSum, prevMoSum, prevYrSum, meta);
-  renderStoreTable(yr, mo, wk, store, team);
-  renderDetailTable(yr, mo, wk, store, team);
+renderPeriodHeader(yr, mo, wk);
+renderKPI(curSum, prevMoSum, prevYrSum);
+setupKpiModalEvents();
+renderCharts(curSum, prevMoSum, prevYrSum, meta);
+renderStoreTable(yr, mo, wk, store, team);
+renderDetailTable(yr, mo, wk, store, team);
 }
 
 // ─── 엑셀 다운로드 ───────────────────────────────────────────────
