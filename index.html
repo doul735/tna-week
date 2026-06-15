@@ -307,6 +307,39 @@
   </div>
 
 </main>
+<div id="kpiModal" class="kpi-modal" style="display:none;">
+  <div class="kpi-modal-backdrop" onclick="closeKpiModal()"></div>
+
+  <div class="kpi-modal-panel">
+    <button class="kpi-modal-close" onclick="closeKpiModal()">✕</button>
+
+    <div class="kpi-modal-title" id="kpiModalTitle">지표명</div>
+    <div class="kpi-modal-value" id="kpiModalValue">0</div>
+
+    <div class="kpi-modal-grid">
+      <div class="kpi-modal-box">
+        <div class="box-label">전월 동기</div>
+        <div class="box-value" id="kpiModalPrevMonth">-</div>
+      </div>
+      <div class="kpi-modal-box">
+        <div class="box-label">전년 동기</div>
+        <div class="box-value" id="kpiModalPrevYear">-</div>
+      </div>
+      <div class="kpi-modal-box">
+        <div class="box-label">전월 대비</div>
+        <div class="box-value" id="kpiModalDeltaMonth">-</div>
+      </div>
+      <div class="kpi-modal-box">
+        <div class="box-label">전년 대비</div>
+        <div class="box-value" id="kpiModalDeltaYear">-</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
 
 <script src="./app.js"></script>
 </body>
