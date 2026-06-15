@@ -1,5 +1,3 @@
-// ─── 데이터 ───────────────────────────────────────────────────────
-// 구글 시트 연동 시 이 URL을 Apps Script 웹 앱 URL로 교체하세요
 const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_TCR45muWiseITDdxHo_sYPKYxLS5CgRi_1LCouEgrapDkMQ7VE-HAj8zURoI2Uc/exec';
 const TIRE_DATA_URL = DATA_URL + '?type=tire';
 
