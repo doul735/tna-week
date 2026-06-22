@@ -747,3 +747,79 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+// ─────────────────────────────────────────────
+// KPI 모달 강제 수정 코드
+// 사이트 첫 진입 시 모달 숨김 + 닫기 버튼 정상 작동
+// ─────────────────────────────────────────────
+
+function hideKpiModal() {
+  const modal = document.getElementById('kpiModal');
+  if (!modal) return;
+
+  modal.setAttribute('hidden', '');
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function showKpiModal() {
+  const modal = document.getElementById('kpiModal');
+  if (!modal) return;
+
+  modal.removeAttribute('hidden');
+  modal.style.display = 'grid';
+  document.body.style.overflow = 'hidden';
+}
+
+// 기존 openKpiModal 덮어쓰기
+window.openKpiModal = function (data) {
+  const title = document.getElementById('kpiModalTitle');
+  const value = document.getElementById('kpiModalValue');
+  const prevMonth = document.getElementById('kpiModalPrevMonth');
+  const prevYear = document.getElementById('kpiModalPrevYear');
+  const deltaMonth = document.getElementById('kpiModalDeltaMonth');
+  const deltaYear = document.getElementById('kpiModalDeltaYear');
+
+  if (title) title.textContent = data.title || '-';
+  if (value) value.textContent = data.current || '-';
+  if (prevMonth) prevMonth.textContent = data.prevMonth || '-';
+  if (prevYear) prevYear.textContent = data.prevYear || '-';
+  if (deltaMonth) deltaMonth.textContent = data.deltaMonth || '-';
+  if (deltaYear) deltaYear.textContent = data.deltaYear || '-';
+
+  showKpiModal();
+};
+
+// 기존 closeKpiModal 덮어쓰기
+window.closeKpiModal = function () {
+  hideKpiModal();
+};
+
+// 페이지 로딩 직후 무조건 모달 숨기기
+window.addEventListener('load', function () {
+  hideKpiModal();
+
+  const modal = document.getElementById('kpiModal');
+  if (!modal) return;
+
+  const closeBtn = modal.querySelector('.modal-close, .kpi-modal-close, button[aria-label="닫기"], button');
+
+  if (closeBtn) {
+    closeBtn.onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      hideKpiModal();
+    };
+  }
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) {
+      hideKpiModal();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      hideKpiModal();
+    }
+  });
+});
