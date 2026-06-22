@@ -896,3 +896,8 @@ tr.total-row td {
     width: 100% !important;
   }
 }
+/* 상단 제목 영역 위쪽 공백 추가 */
+.report-header,
+.dashboard-header {
+  padding-top: 14px !important;
+}
