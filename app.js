@@ -11,7 +11,7 @@ let TEAMS = [];
 let charts = {};
 let lastRenderData = null;
 
-const METRICS = ['views', 'conn', 'miss', 'res_in', 'res_req', 'review', 'chat'];
+const METRICS = ['views', 'conn', 'miss', 'res_in', 'res_req', 'review', 'neg_review', 'chat'];
 
 const METRIC_DEFS = {
   views: {
