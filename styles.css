@@ -689,3 +689,6 @@ tr:hover td {
     align-items: flex-start;
   }
 }
+[hidden] {
+  display: none !important;
+}
