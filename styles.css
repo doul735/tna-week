@@ -941,3 +941,58 @@ tr:hover td {
   line-height:1.6;
   margin:0;
 }
+/* 차트 4개 영역 레이아웃 */
+.dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  width: 100%;
+}
+
+/* 왼쪽 큰 박스 */
+.dashboard-chart-grid .chart-wide {
+  grid-column: 1 / 2;
+  min-width: 0;
+}
+
+/* 오른쪽 작은 박스 */
+.dashboard-chart-grid .chart-side {
+  grid-column: 2 / 3;
+  min-width: 0;
+}
+
+/* 카드 높이 균형 */
+.dashboard-chart-grid .chart-card {
+  height: 100%;
+}
+
+/* 위 행 */
+.dashboard-chart-grid .trend-card {
+  min-height: 350px;
+}
+
+.dashboard-chart-grid .group-card {
+  min-height: 350px;
+}
+
+/* 아래 행 */
+.dashboard-chart-grid .reservation-card {
+  min-height: 350px;
+}
+
+.dashboard-chart-grid .compare-card {
+  min-height: 350px;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .dashboard-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-chart-grid .chart-wide,
+  .dashboard-chart-grid .chart-side {
+    grid-column: auto;
+  }
+}
