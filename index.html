@@ -17,9 +17,10 @@
   <meta property="og:url" content="https://tna-report.pllet.com" />
   <meta property="og:type" content="website" />
 
-  <link rel="stylesheet" href="./styles.css?v=20260622-fixed" />
+  <link rel="stylesheet" href="./styles.css?v=20260622-v2" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="./app.js?v=20260622-fixed" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="./app.js?v=20260622-v2" defer></script>
 </head>
 
 <body>
@@ -33,28 +34,41 @@
         </div>
       </div>
 
-      <div class="header-period" id="header-period">데이터 불러오는 중...</div>
+      <div class="header-actions">
+        <button class="download-btn" id="downloadRawBtn" type="button">로데이터 엑셀 내려받기</button>
+        <div class="header-period" id="header-period">데이터 불러오는 중...</div>
+      </div>
     </header>
 
-    <section class="filter-panel">
+    <section class="filter-panel" aria-label="보고서 조회 조건">
+      <div class="filter-item mode-item">
+        <label for="sel-period-mode">조회 기준</label>
+        <select id="sel-period-mode">
+          <option value="WEEK">주간 조회 · 월~일 1주</option>
+          <option value="MONTH">월별 조회 · 선택 월 전체</option>
+        </select>
+      </div>
+
       <div class="filter-item">
-        <label for="sel-store">매장명 선택</label>
+        <label for="sel-store">매장별 조회</label>
         <select id="sel-store"></select>
       </div>
 
       <div class="filter-item">
-        <label for="sel-team">팀 선택</label>
+        <label for="sel-team">팀별 조회</label>
         <select id="sel-team"></select>
       </div>
 
-      <div class="filter-item wide">
-        <label for="sel-week">월요일~일요일 기간 선택</label>
+      <div class="filter-item week-filter">
+        <label for="sel-week">주간 선택</label>
         <select id="sel-week"></select>
+        <p class="filter-help">월요일~일요일 한 주만 합산</p>
       </div>
 
-      <div class="filter-item">
-        <label for="sel-month">월별 기간 선택</label>
+      <div class="filter-item month-filter">
+        <label for="sel-month">월별 선택</label>
         <select id="sel-month"></select>
+        <p class="filter-help">해당 월 전체 주차 합산</p>
       </div>
 
       <button class="refresh-btn" id="refreshBtn" type="button">최신 조회</button>
@@ -64,7 +78,7 @@
       <article class="period-card current">
         <span class="dot"></span>
         <div>
-          <strong>당월 / 당주</strong>
+          <strong id="period-current-title">선택 기준</strong>
           <p id="period-current">-</p>
         </div>
       </article>
@@ -72,7 +86,7 @@
       <article class="period-card prev-month">
         <span class="dot"></span>
         <div>
-          <strong>전월 동기</strong>
+          <strong id="period-prev-month-title">전월 동기</strong>
           <p id="period-prev-month">-</p>
         </div>
       </article>
@@ -80,34 +94,40 @@
       <article class="period-card prev-year">
         <span class="dot"></span>
         <div>
-          <strong>전년 동기</strong>
+          <strong id="period-prev-year-title">전년 동기</strong>
           <p id="period-prev-year">-</p>
         </div>
       </article>
     </section>
 
-    <section class="kpi-grid" id="kpi-grid"></section>
+    <section class="kpi-grid" id="kpi-grid" aria-label="주요 KPI 카드"></section>
 
     <main class="dashboard-chart-grid">
       <section class="panel chart-wide trend-card">
         <div class="panel-header">
-          <h2>주차별 플레이스 조회수 추이</h2>
-          <select id="trendMetricSelect"></select>
+          <div>
+            <h2 id="trendChartTitle">주차별 지표 추이</h2>
+            <p class="panel-subtitle">선택한 지표의 최근 흐름을 숫자와 함께 확인합니다.</p>
+          </div>
+          <select id="trendMetricSelect" aria-label="추이 차트 지표 선택"></select>
         </div>
-        <div class="chart-box">
+        <div class="chart-box tall">
           <canvas id="chart-trend"></canvas>
         </div>
       </section>
 
       <section class="panel chart-side group-card">
         <div class="panel-header">
-          <h2>지표 그룹 구성</h2>
+          <div>
+            <h2>지표 그룹 구성</h2>
+            <p class="panel-subtitle">노출 · 전환 · 관리 항목을 구분해서 보여줍니다.</p>
+          </div>
         </div>
         <div class="donut-layout">
           <div class="chart-box donut">
             <canvas id="chart-groups"></canvas>
           </div>
-          <div class="group-legend">
+          <div class="group-legend" id="group-summary">
             <div><span class="legend-dot orange"></span><b>노출 관련 지표</b><p>조회수 · 예약유입</p></div>
             <div><span class="legend-dot blue"></span><b>전환 관련 지표</b><p>연결콜 · 예약신청</p></div>
             <div><span class="legend-dot green"></span><b>관리 관련 지표</b><p>미연결콜 · 리뷰 · 부정리뷰 · 톡톡상담</p></div>
@@ -115,21 +135,27 @@
         </div>
       </section>
 
-      <section class="panel chart-wide reservation-card">
+      <section class="panel chart-wide conversion-card">
         <div class="panel-header">
-          <h2>예약 신청 추이</h2>
+          <div>
+            <h2 id="conversionChartTitle">전환 지표 추이</h2>
+            <p class="panel-subtitle">예약신청만 따로 보지 않고 연결콜과 함께 비교합니다.</p>
+          </div>
         </div>
-        <div class="chart-box">
+        <div class="chart-box tall">
           <canvas id="chart-reservation"></canvas>
         </div>
       </section>
 
       <section class="panel chart-side compare-card">
         <div class="panel-header">
-          <h2>전월 / 전년 동기 비교</h2>
-          <select id="compareMetricSelect"></select>
+          <div>
+            <h2>전월 / 전년 동기 비교</h2>
+            <p class="panel-subtitle">선택 지표의 현재 · 전월 · 전년 값을 비교합니다.</p>
+          </div>
+          <select id="compareMetricSelect" aria-label="비교 차트 지표 선택"></select>
         </div>
-        <div class="chart-box">
+        <div class="chart-box tall">
           <canvas id="chart-compare"></canvas>
         </div>
       </section>
@@ -149,7 +175,10 @@
 
     <section class="table-panel">
       <div class="panel-header">
-        <h2>매장별 상세 데이터</h2>
+        <div>
+          <h2>매장별 상세 데이터</h2>
+          <p class="panel-subtitle" id="table-caption">선택한 조회 기준에 맞춰 매장별 합산 데이터가 표시됩니다.</p>
+        </div>
       </div>
 
       <div class="table-scroll">
