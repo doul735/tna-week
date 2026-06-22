@@ -899,5 +899,5 @@ tr.total-row td {
 /* 상단 제목 영역 위쪽 공백 추가 */
 .report-header,
 .dashboard-header {
-  padding-top: 14px !important;
+  padding-top: 50px !important;
 }
