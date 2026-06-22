@@ -17,50 +17,16 @@
   <meta property="og:url" content="https://tna-report.pllet.com" />
   <meta property="og:type" content="website" />
 
-  <link rel="stylesheet" href="./styles.css?v=20260622" />
-<!-- KPI 카드 확대 모달 -->
-<div id="kpiModal" class="kpi-modal" hidden>
-  <div class="kpi-modal-box">
-    <button type="button" class="kpi-modal-close" onclick="closeKpiModal()">×</button>
-
-    <div class="kpi-modal-label">선택 지표</div>
-    <h2 id="kpiModalTitle">-</h2>
-
-    <div id="kpiModalValue" class="kpi-modal-value">-</div>
-
-    <div class="kpi-modal-grid">
-      <div>
-        <span>전월 동기</span>
-        <strong id="kpiModalPrevMonth">-</strong>
-      </div>
-      <div>
-        <span>전년 동기</span>
-        <strong id="kpiModalPrevYear">-</strong>
-      </div>
-      <div>
-        <span>전월 증감</span>
-        <strong id="kpiModalDeltaMonth">-</strong>
-      </div>
-      <div>
-        <span>전년 증감</span>
-        <strong id="kpiModalDeltaYear">-</strong>
-      </div>
-    </div>
-
-    <p class="kpi-modal-desc">
-      선택한 KPI의 현재값과 전월·전년 동기 대비 변화를 크게 확인할 수 있습니다.
-    </p>
-  </div>
-</div>
+  <link rel="stylesheet" href="./styles.css?v=20260622-fixed" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="./app.js?v=20260622" defer></script>
+  <script src="./app.js?v=20260622-fixed" defer></script>
 </head>
 
 <body>
   <div class="page-shell">
     <header class="report-header">
       <div class="brand-area">
-        <div class="brand-symbol">T</div>
+        <div class="brand-symbol" aria-label="T Station Symbol">T</div>
         <div>
           <h1>네이버 플레이스 직영점 주간보고서</h1>
           <p>TNA Report · 주요 성과 요약 대시보드</p>
@@ -122,26 +88,18 @@
 
     <section class="kpi-grid" id="kpi-grid"></section>
 
-    <main class="dashboard-grid">
-      <section class="panel panel-large">
+    <main class="dashboard-chart-grid">
+      <section class="panel chart-wide trend-card">
         <div class="panel-header">
           <h2>주차별 플레이스 조회수 추이</h2>
-          <select id="trendMetricSelect">
-            <option value="views">플레이스 조회수</option>
-            <option value="conn">연결콜</option>
-            <option value="miss">미연결콜</option>
-            <option value="res_in">예약유입</option>
-            <option value="res_req">예약신청</option>
-            <option value="review">리뷰</option>
-            <option value="chat">톡톡상담</option>
-          </select>
+          <select id="trendMetricSelect"></select>
         </div>
         <div class="chart-box">
           <canvas id="chart-trend"></canvas>
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel chart-side group-card">
         <div class="panel-header">
           <h2>지표 그룹 구성</h2>
         </div>
@@ -152,12 +110,12 @@
           <div class="group-legend">
             <div><span class="legend-dot orange"></span><b>노출 관련 지표</b><p>조회수 · 예약유입</p></div>
             <div><span class="legend-dot blue"></span><b>전환 관련 지표</b><p>연결콜 · 예약신청</p></div>
-            <div><span class="legend-dot green"></span><b>관리 관련 지표</b><p>미연결콜 · 리뷰 · 톡톡상담</p></div>
+            <div><span class="legend-dot green"></span><b>관리 관련 지표</b><p>미연결콜 · 리뷰 · 부정리뷰 · 톡톡상담</p></div>
           </div>
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel chart-wide reservation-card">
         <div class="panel-header">
           <h2>예약 신청 추이</h2>
         </div>
@@ -166,18 +124,10 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel chart-side compare-card">
         <div class="panel-header">
           <h2>전월 / 전년 동기 비교</h2>
-          <select id="compareMetricSelect">
-            <option value="views">플레이스 조회수</option>
-            <option value="conn">연결콜</option>
-            <option value="miss">미연결콜</option>
-            <option value="res_in">예약유입</option>
-            <option value="res_req">예약신청</option>
-            <option value="review">리뷰</option>
-            <option value="chat">톡톡상담</option>
-          </select>
+          <select id="compareMetricSelect"></select>
         </div>
         <div class="chart-box">
           <canvas id="chart-compare"></canvas>
@@ -191,7 +141,7 @@
         <strong>이번 주 인사이트</strong>
       </div>
       <p id="weekly-insight">데이터를 불러오면 이번 주 핵심 변화가 자동으로 표시됩니다.</p>
-      <button type="button" onclick="document.querySelector('.dashboard-grid')?.scrollIntoView({behavior:'smooth'})">
+      <button type="button" onclick="document.querySelector('.dashboard-chart-grid')?.scrollIntoView({behavior:'smooth'})">
         상세 분석 보기
         <span>›</span>
       </button>
@@ -214,6 +164,7 @@
               <th>예약유입</th>
               <th>예약신청</th>
               <th>리뷰</th>
+              <th>부정리뷰</th>
               <th>톡톡상담</th>
             </tr>
           </thead>
@@ -227,9 +178,9 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="kpiModal" hidden>
-    <div class="modal-card">
-      <button class="modal-close" type="button" id="modalCloseBtn">×</button>
+  <div class="kpi-modal" id="kpiModal" hidden>
+    <div class="kpi-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="kpi-modal-close" type="button" id="modalCloseBtn" aria-label="닫기">×</button>
       <p class="modal-eyebrow" id="modalGroup">지표 상세</p>
       <h2 id="modalTitle">-</h2>
       <div class="modal-value" id="modalValue">-</div>
