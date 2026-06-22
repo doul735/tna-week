@@ -688,7 +688,7 @@ tr:hover td {
   .insight-panel {
     align-items: flex-start;
   }
-}
-[hidden] {
+[hidden],
+.modal-backdrop[hidden] {
   display: none !important;
 }
