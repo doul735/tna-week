@@ -135,22 +135,24 @@ async function fetchJsonWithCache(url, cacheKey, ttlMs = 5 * 60 * 1000, forceFre
 function normalizeRows(data) {
   const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
 
-  return rows.map(r => ({
-    yr: num(r['년'] ?? r.yr),
-    mo: num(r['월'] ?? r.mo),
-    wk: num(r['주'] ?? r.wk),
-    start: toDateString(r['시작일(월)'] ?? r.start),
-    end: toDateString(r['종료일(일)'] ?? r.end),
-    store: String(r['매장명'] ?? r.store ?? '').trim(),
-    team: String(r['팀'] ?? r.team ?? '').trim(),
+ function normalizePlaceRow(r) {
+  return {
+    yr: num(r['년'] ?? r.yr ?? r.year),
+    mo: num(r['월'] ?? r.mo ?? r.month),
+    wk: num(r['주'] ?? r['주차'] ?? r.wk ?? r.week),
+    start: dateText(r['시작일(월)'] ?? r['시작일'] ?? r.start ?? r.start_date),
+    end: dateText(r['종료일(일)'] ?? r['종료일'] ?? r.end ?? r.end_date),
+    store: text(r['매장명'] ?? r.store ?? r.store_name),
+    team: text(r['팀'] ?? r.team),
     views: num(r['조회수'] ?? r.views),
     conn: num(r['연결콜'] ?? r.conn),
     miss: num(r['미연결콜'] ?? r.miss),
-    res_in: num(r['예약유입'] ?? r.res_in),
-    res_req: num(r['예약신청'] ?? r.res_req),
+    res_in: num(r['예약유입'] ?? r.res_in ?? r.resIn),
+    res_req: num(r['예약신청'] ?? r.res_req ?? r.resReq),
     review: num(r['리뷰'] ?? r.review),
-    chat: num(r['톡톡상담'] ?? r.chat)
-  })).filter(r => r.yr && r.mo && r.wk && r.store);
+    neg_review: num(r['부정리뷰'] ?? r.neg_review ?? r.negative_review),
+    chat: num(r['톡톡상담'] ?? r.chat),
+  };
 }
 
 function rebuildMetaFromRaw() {
@@ -189,21 +191,19 @@ function rebuildMetaFromRaw() {
 }
 
 function sumRows(rows) {
-  const result = {
+  const s = {
     views: 0,
     conn: 0,
     miss: 0,
     res_in: 0,
     res_req: 0,
     review: 0,
+    neg_review: 0,
     chat: 0
   };
-
-  rows.forEach(row => {
-    METRICS.forEach(key => {
-      result[key] += num(row[key]);
-    });
-  });
+  rows.forEach(r => METRICS.forEach(m => { s[m] += num(r[m]); }));
+  return s;
+}
 
   return result;
 }
