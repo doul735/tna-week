@@ -823,3 +823,189 @@ window.addEventListener('load', function () {
     }
   });
 });
+
+const KPI_DEFS = [
+  {
+    key: 'views',
+    label: '플레이스 조회수',
+    sub: '노출 관련 지표',
+    chip: '노출',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+  },
+  {
+    key: 'conn',
+    label: '연결콜',
+    sub: '전환 관련 지표',
+    chip: '전환',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.84a16 16 0 0 0 6 6l.93-.93a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z"/></svg>`
+  },
+  {
+    key: 'miss',
+    label: '미연결콜',
+    sub: '관리 관련 지표',
+    chip: '관리',
+    higher: false,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h11"/></svg>`
+  },
+  {
+    key: 'res_in',
+    label: '예약유입',
+    sub: '노출 관련 지표',
+    chip: '노출',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`
+  },
+  {
+    key: 'res_req',
+    label: '예약신청',
+    sub: '전환 관련 지표',
+    chip: '전환',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+  },
+  {
+    key: 'review',
+    label: '리뷰',
+    sub: '관리 관련 지표',
+    chip: '관리',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+  },
+  {
+    key: 'neg_review',
+    label: '부정리뷰',
+    sub: '관리 관련 지표',
+    chip: '관리',
+    higher: false,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+  },
+  {
+    key: 'chat',
+    label: '톡톡상담',
+    sub: '관리 관련 지표',
+    chip: '관리',
+    higher: true,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`
+  }
+];
+
+function rateClassText(rate) {
+  if (!rate) return { cls: 'rate-flat', text: '—' };
+  const arrow = rate.d > 0 ? '▲' : rate.d < 0 ? '▼' : '';
+  const cls = rate.good ? 'rate-up' : 'rate-dn';
+  return { cls, text: `${arrow}${Math.abs(rate.d).toFixed(1)}%` };
+}
+
+function safeNumberText(v) {
+  return v === null || v === undefined ? '—' : num(v).toLocaleString();
+}
+
+function renderKPI(cur, prevMo, prevYr) {
+  const grid = $('kpi-grid');
+  if (!grid) return;
+
+  grid.innerHTML = KPI_DEFS.map(def => {
+    const v = cur?.[def.key] ?? 0;
+    const pm = prevMo?.[def.key] ?? 0;
+    const py = prevYr?.[def.key] ?? 0;
+
+    const rMo = calcRate(v, pm, def.higher);
+    const rPy = calcRate(v, py, def.higher);
+
+    const moRate = rateClassText(rMo);
+    const pyRate = rateClassText(rPy);
+
+    return `
+      <div class="kpi-card-simple"
+        data-title="${def.label}"
+        data-current="${safeNumberText(v)}"
+        data-prev-month="${safeNumberText(pm)}"
+        data-prev-year="${safeNumberText(py)}"
+        data-delta-month="${moRate.text}"
+        data-delta-year="${pyRate.text}">
+        
+        <div class="kpi-card-head">
+          <div class="kpi-head-left">
+            <div class="kpi-icon-circle">${def.icon}</div>
+            <div class="kpi-title-wrap">
+              <div class="kpi-title">${def.label}</div>
+              <div class="kpi-sub">${def.sub}</div>
+            </div>
+          </div>
+          <div class="kpi-chip">${def.chip}</div>
+        </div>
+
+        <div class="kpi-big-value">${safeNumberText(v)}</div>
+
+        <div class="kpi-compare-boxes">
+          <div class="kpi-compare-mini">
+            <span class="mini-label">전월 동기</span>
+            <span class="mini-value">${safeNumberText(pm)}</span>
+            <span class="mini-rate ${moRate.cls}">${moRate.text}</span>
+          </div>
+          <div class="kpi-compare-mini">
+            <span class="mini-label">전년 동기</span>
+            <span class="mini-value">${safeNumberText(py)}</span>
+            <span class="mini-rate ${pyRate.cls}">${pyRate.text}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  bindKpiCardEvents();
+}
+
+function openKpiModal(data) {
+  const modal = $('kpiModal');
+  if (!modal) return;
+
+  if ($('kpiModalTitle')) $('kpiModalTitle').textContent = data.title || '-';
+  if ($('kpiModalValue')) $('kpiModalValue').textContent = data.current || '-';
+  if ($('kpiModalPrevMonth')) $('kpiModalPrevMonth').textContent = data.prevMonth || '-';
+  if ($('kpiModalPrevYear')) $('kpiModalPrevYear').textContent = data.prevYear || '-';
+  if ($('kpiModalDeltaMonth')) $('kpiModalDeltaMonth').textContent = data.deltaMonth || '-';
+  if ($('kpiModalDeltaYear')) $('kpiModalDeltaYear').textContent = data.deltaYear || '-';
+
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeKpiModal() {
+  const modal = $('kpiModal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function bindKpiCardEvents() {
+  document.querySelectorAll('#kpi-grid .kpi-card-simple').forEach(card => {
+    card.onclick = function () {
+      openKpiModal({
+        title: card.dataset.title || '-',
+        current: card.dataset.current || '-',
+        prevMonth: card.dataset.prevMonth || '-',
+        prevYear: card.dataset.prevYear || '-',
+        deltaMonth: card.dataset.deltaMonth || '-',
+        deltaYear: card.dataset.deltaYear || '-'
+      });
+    };
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeKpiModal();
+});
+
+document.addEventListener('click', function (e) {
+  const modal = $('kpiModal');
+  if (!modal) return;
+  if (e.target === modal) closeKpiModal();
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  const modal = $('kpiModal');
+  if (modal) modal.hidden = true;
+});
