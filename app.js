@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// TNA 대시보드 app.js 전체 교체용
+// 사용 방법: GitHub의 기존 app.js 내용을 전부 삭제하고, 이 코드 전체를 붙여넣으세요.
+// ─────────────────────────────────────────────────────────────────────────────
+
 const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_TCR45muWiseITDdxHo_sYPKYxLS5CgRi_1LCouEgrapDkMQ7VE-HAj8zURoI2Uc/exec';
 
 const RAW = [];
@@ -18,6 +23,7 @@ const METRIC_DEFS = {
     label: '플레이스 조회수',
     group: '노출 관련 지표',
     groupKey: 'exposure',
+    chip: '노출',
     icon: '◎',
     higher: true,
     desc: '네이버 플레이스에서 매장이 얼마나 많이 조회되었는지 확인하는 핵심 노출 지표입니다.'
@@ -26,14 +32,16 @@ const METRIC_DEFS = {
     label: '연결콜',
     group: '전환 관련 지표',
     groupKey: 'convert',
+    chip: '전환',
     icon: '☎',
     higher: true,
-    desc: '고객이 실제로 전화 연결까지 이어진 수치입니다. 문의 전환 흐름을 확인할 수 있습니다.'
+    desc: '고객이 실제 전화 연결까지 이어진 수치입니다. 문의 전환 흐름을 확인할 수 있습니다.'
   },
   miss: {
     label: '미연결콜',
     group: '관리 관련 지표',
     groupKey: 'manage',
+    chip: '관리',
     icon: '×',
     higher: false,
     desc: '연결되지 못한 전화입니다. 낮아질수록 응대 관리가 개선된 것으로 볼 수 있습니다.'
@@ -42,6 +50,7 @@ const METRIC_DEFS = {
     label: '예약유입',
     group: '노출 관련 지표',
     groupKey: 'exposure',
+    chip: '노출',
     icon: '↗',
     higher: true,
     desc: '예약 화면까지 유입된 고객 수입니다. 관심 고객의 행동 흐름을 볼 수 있습니다.'
@@ -50,6 +59,7 @@ const METRIC_DEFS = {
     label: '예약신청',
     group: '전환 관련 지표',
     groupKey: 'convert',
+    chip: '전환',
     icon: '▣',
     higher: true,
     desc: '실제 예약 신청까지 이어진 수치입니다. 예약 전환 성과를 보는 핵심 지표입니다.'
@@ -58,48 +68,389 @@ const METRIC_DEFS = {
     label: '리뷰',
     group: '관리 관련 지표',
     groupKey: 'manage',
+    chip: '관리',
     icon: '☆',
     higher: true,
     desc: '고객 리뷰 발생 수입니다. 매장 신뢰도와 운영 관리 상태를 함께 보여주는 지표입니다.'
+  },
+  neg_review: {
+    label: '부정리뷰',
+    group: '관리 관련 지표',
+    groupKey: 'manage',
+    chip: '관리',
+    icon: '!',
+    higher: false,
+    desc: '부정적인 리뷰 또는 관리가 필요한 리뷰 수치입니다. 낮아질수록 고객 응대와 리뷰 관리 측면에서 긍정적으로 볼 수 있습니다.'
   },
   chat: {
     label: '톡톡상담',
     group: '관리 관련 지표',
     groupKey: 'manage',
+    chip: '관리',
     icon: '●',
     higher: true,
     desc: '네이버 톡톡 상담 수치입니다. 전화 외 문의 채널의 반응을 확인할 수 있습니다.'
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 기본 유틸
+// ─────────────────────────────────────────────────────────────────────────────
+
 function $(id) {
   return document.getElementById(id);
 }
 
+function text(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
 function num(value) {
   if (value === null || value === undefined || value === '') return 0;
-  return Number(String(value).replace(/,/g, '')) || 0;
+  return Number(String(value).replace(/,/g, '').trim()) || 0;
 }
 
 function fmt(value) {
   return num(value).toLocaleString();
 }
 
-function toDateString(value) {
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDateLocal(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function dateText(value) {
   if (!value) return '';
 
   if (typeof value === 'number') {
     const base = new Date(1899, 11, 30);
     base.setDate(base.getDate() + value);
-    return base.toISOString().split('T')[0];
+    return formatDateLocal(base);
   }
 
-  return String(value).split('T')[0];
+  const str = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+
+  if (/^\d{4}\.\d{1,2}\.\d{1,2}/.test(str)) {
+    const parts = str.split(/[.\s]/).filter(Boolean);
+    return `${parts[0]}-${pad2(parts[1])}-${pad2(parts[2])}`;
+  }
+
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}/.test(str)) {
+    const parts = str.split(/[\/\s]/).filter(Boolean);
+    return `${parts[0]}-${pad2(parts[1])}-${pad2(parts[2])}`;
+  }
+
+  return str.split('T')[0];
+}
+
+function setTextIfExists(id, value) {
+  const el = $(id);
+  if (el) el.textContent = value;
+}
+
+function setHtmlIfExists(id, value) {
+  const el = $(id);
+  if (el) el.innerHTML = value;
 }
 
 function cacheBustUrl(url) {
   return url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSS 보정
+// styles.css를 부분 수정하지 않아도 모달/카드 기본 스타일이 적용되도록 JS에서 보정합니다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function injectRuntimeCss() {
+  if ($('tna-runtime-fixes')) return;
+
+  const style = document.createElement('style');
+  style.id = 'tna-runtime-fixes';
+  style.textContent = `
+    #kpiModal[hidden],
+    .kpi-modal[hidden] {
+      display: none !important;
+    }
+
+    .kpi-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      background: rgba(0, 8, 14, .72);
+      backdrop-filter: blur(12px);
+    }
+
+    .kpi-modal.is-open {
+      display: grid !important;
+    }
+
+    .kpi-modal-panel {
+      width: min(560px, 92vw);
+      border: 1px solid rgba(255, 122, 0, .45);
+      border-radius: 26px;
+      background:
+        radial-gradient(circle at top right, rgba(255, 122, 0, .18), transparent 36%),
+        linear-gradient(135deg, rgba(15, 32, 46, .98), rgba(14, 21, 30, .98));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .55);
+      padding: 30px;
+      color: #f8fafc;
+    }
+
+    .kpi-modal-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+
+    .kpi-modal-group {
+      color: #ff8a1c;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .kpi-modal-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      margin: 0;
+    }
+
+    .kpi-modal-close {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      font-size: 26px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .kpi-modal-value {
+      font-size: 54px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      margin: 12px 0 24px;
+    }
+
+    .kpi-modal-compare {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-modal-box {
+      border: 1px solid rgba(148, 163, 184, .2);
+      border-radius: 18px;
+      background: rgba(15, 23, 42, .52);
+      padding: 18px;
+    }
+
+    .kpi-modal-box-label {
+      display: block;
+      color: #93a4b8;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .kpi-modal-box-value {
+      display: block;
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .kpi-modal-desc {
+      color: #cbd5e1;
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    #kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .kpi-card {
+      position: relative;
+      min-height: 154px;
+      border: 1px solid rgba(148, 163, 184, .22);
+      border-radius: 20px;
+      padding: 20px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 122, 0, .14), transparent 34%),
+        linear-gradient(135deg, rgba(18, 34, 48, .96), rgba(13, 20, 29, .96));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+      overflow: hidden;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 122, 0, .45);
+      box-shadow: 0 18px 40px rgba(0,0,0,.24);
+    }
+
+    .kpi-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .kpi-head-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .kpi-icon {
+      width: 40px;
+      height: 40px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 122, 0, .36);
+      background: rgba(255, 122, 0, .12);
+      color: #ff8a1c;
+      font-weight: 900;
+    }
+
+    .kpi-title {
+      margin: 0 0 4px;
+      font-size: 17px;
+      font-weight: 900;
+      color: #f8fafc;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kpi-group {
+      color: #9fb0c2;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kpi-chip {
+      flex: 0 0 auto;
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: #cbd5e1;
+      font-size: 12px;
+      font-weight: 800;
+      background: rgba(2, 6, 23, .24);
+    }
+
+    .kpi-value {
+      font-size: 38px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      color: #f8fafc;
+      margin-bottom: 18px;
+    }
+
+    .kpi-rates {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .kpi-rate-box {
+      border: 1px solid rgba(148, 163, 184, .14);
+      border-radius: 14px;
+      background: rgba(2, 6, 23, .28);
+      padding: 10px;
+    }
+
+    .rate-label {
+      display: block;
+      margin-bottom: 4px;
+      color: #a8b6c8;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .rate-up,
+    .rate-good {
+      color: #32d583;
+      font-weight: 900;
+    }
+
+    .rate-down,
+    .rate-bad {
+      color: #fb7185;
+      font-weight: 900;
+    }
+
+    .rate-flat {
+      color: #94a3b8;
+      font-weight: 900;
+    }
+
+    .empty-state {
+      margin-top: 18px;
+      border: 1px solid rgba(251, 113, 133, .28);
+      border-radius: 18px;
+      background: rgba(251, 113, 133, .08);
+      padding: 18px;
+      color: #fecdd3;
+    }
+
+    @media (max-width: 1080px) {
+      #kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      #kpi-grid,
+      .kpi-modal-compare {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-modal-panel {
+        padding: 22px;
+      }
+
+      .kpi-modal-value {
+        font-size: 44px;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 데이터 로딩 / 정규화
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchJsonWithCache(url, cacheKey, ttlMs = 5 * 60 * 1000, forceFresh = false) {
   const now = Date.now();
@@ -132,10 +483,7 @@ async function fetchJsonWithCache(url, cacheKey, ttlMs = 5 * 60 * 1000, forceFre
   return data;
 }
 
-function normalizeRows(data) {
-  const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-
- function normalizePlaceRow(r) {
+function normalizePlaceRow(r) {
   return {
     yr: num(r['년'] ?? r.yr ?? r.year),
     mo: num(r['월'] ?? r.mo ?? r.month),
@@ -150,10 +498,36 @@ function normalizeRows(data) {
     res_in: num(r['예약유입'] ?? r.res_in ?? r.resIn),
     res_req: num(r['예약신청'] ?? r.res_req ?? r.resReq),
     review: num(r['리뷰'] ?? r.review),
-    neg_review: num(r['부정리뷰'] ?? r.neg_review ?? r.negative_review),
-    chat: num(r['톡톡상담'] ?? r.chat),
+    neg_review: num(r['부정리뷰'] ?? r.neg_review ?? r.negative_review ?? r.bad_review),
+    chat: num(r['톡톡상담'] ?? r.chat)
   };
 }
+
+function normalizeRows(data) {
+  const rows =
+    Array.isArray(data) ? data :
+    Array.isArray(data?.data) ? data.data :
+    Array.isArray(data?.rows) ? data.rows :
+    [];
+
+  return rows
+    .map(normalizePlaceRow)
+    .filter(r => r.yr && r.mo && r.wk && r.store);
+}
+
+async function loadData(forceFresh = false) {
+  const data = await fetchJsonWithCache(DATA_URL, 'tna_place_dashboard_rows_v4', 5 * 60 * 1000, forceFresh);
+  const rows = normalizeRows(data);
+
+  RAW.length = 0;
+  rows.forEach(row => RAW.push(row));
+
+  rebuildMetaFromRaw();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 데이터 집계
+// ─────────────────────────────────────────────────────────────────────────────
 
 function rebuildMetaFromRaw() {
   weekMeta = {};
@@ -176,7 +550,9 @@ function rebuildMetaFromRaw() {
   });
 
   weekKeys = Object.keys(weekMeta).sort((a, b) => {
-    return new Date(weekMeta[a].start) - new Date(weekMeta[b].start);
+    const ad = weekMeta[a].start ? new Date(weekMeta[a].start) : new Date(weekMeta[a].yr, weekMeta[a].mo - 1, weekMeta[a].wk);
+    const bd = weekMeta[b].start ? new Date(weekMeta[b].start) : new Date(weekMeta[b].yr, weekMeta[b].mo - 1, weekMeta[b].wk);
+    return ad - bd;
   });
 
   monthKeys = [...new Set(RAW.map(r => `${r.yr}-${r.mo}`))]
@@ -191,21 +567,16 @@ function rebuildMetaFromRaw() {
 }
 
 function sumRows(rows) {
-  const s = {
-    views: 0,
-    conn: 0,
-    miss: 0,
-    res_in: 0,
-    res_req: 0,
-    review: 0,
-    neg_review: 0,
-    chat: 0
-  };
-  rows.forEach(r => METRICS.forEach(m => { s[m] += num(r[m]); }));
-  return s;
-}
+  const s = {};
+  METRICS.forEach(key => { s[key] = 0; });
 
-  return result;
+  rows.forEach(r => {
+    METRICS.forEach(key => {
+      s[key] += num(r[key]);
+    });
+  });
+
+  return s;
 }
 
 function hasAnyData(sum) {
@@ -226,7 +597,7 @@ function getRowsByWeekKey(weekKey, store = 'ALL', team = 'ALL') {
 }
 
 function getRowsByMonthKey(monthKey, store = 'ALL', team = 'ALL') {
-  const [yr, mo] = monthKey.split('-').map(Number);
+  const [yr, mo] = String(monthKey).split('-').map(Number);
 
   return RAW.filter(r =>
     r.yr === yr &&
@@ -257,11 +628,11 @@ function prevYearKey(yr, mo, wk) {
 function deltaRate(current, previous, higher = true) {
   if (previous === null || previous === undefined || num(previous) === 0) return null;
 
-  const rate = ((num(current) - num(previous)) / num(previous)) * 100;
+  const value = ((num(current) - num(previous)) / num(previous)) * 100;
 
   return {
-    value: rate,
-    good: higher ? rate >= 0 : rate <= 0
+    value,
+    good: higher ? value >= 0 : value <= 0
   };
 }
 
@@ -269,32 +640,41 @@ function rateHtml(current, previous, higher, label) {
   const rate = deltaRate(current, previous, higher);
 
   if (!rate) {
-    return `<span><span class="rate-label">${label}</span><span class="rate-flat">—</span></span>`;
+    return `
+      <div class="kpi-rate-box">
+        <span class="rate-label">${label}</span>
+        <span class="rate-flat">—</span>
+      </div>
+    `;
   }
 
-  const arrow = rate.value > 0 ? '↑' : rate.value < 0 ? '↓' : '–';
+  const arrow = rate.value > 0 ? '▲' : rate.value < 0 ? '▼' : '–';
   const cls = rate.good ? 'rate-up' : 'rate-down';
 
-  return `<span><span class="rate-label">${label}</span><span class="${cls}">${arrow} ${Math.abs(rate.value).toFixed(1)}%</span></span>`;
+  return `
+    <div class="kpi-rate-box">
+      <span class="rate-label">${label}</span>
+      <span class="${cls}">${arrow} ${Math.abs(rate.value).toFixed(1)}%</span>
+    </div>
+  `;
 }
 
-function createSparkline(values, groupKey) {
-  const clean = values.map(num);
-  const max = Math.max(...clean, 1);
-  const min = Math.min(...clean);
-  const range = max - min || 1;
+// ─────────────────────────────────────────────────────────────────────────────
+// 셀렉트 초기화
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const points = clean.map((v, i) => {
-    const x = clean.length === 1 ? 100 : (i / (clean.length - 1)) * 100;
-    const y = 34 - ((v - min) / range) * 28;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+function fillMetricSelect(selectId) {
+  const select = $(selectId);
+  if (!select) return;
 
-  return `
-    <svg class="sparkline ${groupKey}" viewBox="0 0 100 44" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points="${points}"></polyline>
-    </svg>
-  `;
+  const currentValue = select.value || 'views';
+
+  select.innerHTML = METRICS.map(key => {
+    const def = METRIC_DEFS[key];
+    return `<option value="${key}">${def.label}</option>`;
+  }).join('');
+
+  if (METRIC_DEFS[currentValue]) select.value = currentValue;
 }
 
 function initSelects() {
@@ -302,6 +682,11 @@ function initSelects() {
   const selTeam = $('sel-team');
   const selWeek = $('sel-week');
   const selMonth = $('sel-month');
+
+  if (!selStore || !selTeam || !selWeek || !selMonth) {
+    console.warn('필수 선택 박스 ID를 찾지 못했습니다.');
+    return;
+  }
 
   selStore.innerHTML = '<option value="ALL">전체 매장</option>';
   STORES.forEach(store => {
@@ -325,17 +710,24 @@ function initSelects() {
     selMonth.innerHTML += `<option value="${key}">${yr}년 ${mo}월</option>`;
   });
 
+  fillMetricSelect('trendMetricSelect');
+  fillMetricSelect('compareMetricSelect');
+
   const latestDataWeek = [...weekKeys].reverse().find(key => hasAnyData(sumRows(getRowsByWeekKey(key))));
+
   if (latestDataWeek) {
     selWeek.value = latestDataWeek;
     const m = weekMeta[latestDataWeek];
     selMonth.value = `${m.yr}-${m.mo}`;
   } else if (weekKeys.length) {
     selWeek.value = weekKeys[weekKeys.length - 1];
+    const m = weekMeta[selWeek.value];
+    selMonth.value = `${m.yr}-${m.mo}`;
   }
 
   selStore.onchange = renderDashboard;
   selTeam.onchange = renderDashboard;
+
   selWeek.onchange = () => {
     const meta = weekMeta[selWeek.value];
     if (meta && [...selMonth.options].some(o => o.value === `${meta.yr}-${meta.mo}`)) {
@@ -346,12 +738,14 @@ function initSelects() {
 
   selMonth.onchange = () => {
     const [yr, mo] = selMonth.value.split('-').map(Number);
+
     const matchedWeeks = weekKeys.filter(key => {
       const m = weekMeta[key];
       return m.yr === yr && m.mo === mo;
     });
 
     const latestWeek = [...matchedWeeks].reverse().find(key => hasAnyData(sumRows(getRowsByWeekKey(key))));
+
     if (latestWeek) {
       selWeek.value = latestWeek;
     } else if (matchedWeeks.length) {
@@ -361,42 +755,50 @@ function initSelects() {
     renderDashboard();
   };
 
-  $('trendMetricSelect').onchange = renderDashboard;
-  $('compareMetricSelect').onchange = renderDashboard;
+  const trendMetricSelect = $('trendMetricSelect');
+  const compareMetricSelect = $('compareMetricSelect');
+
+  if (trendMetricSelect) trendMetricSelect.onchange = renderDashboard;
+  if (compareMetricSelect) compareMetricSelect.onchange = renderDashboard;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 화면 렌더링
+// ─────────────────────────────────────────────────────────────────────────────
 
 function renderPeriodCards(meta, prevMoMeta, prevYrMeta) {
-  const currentText = `${meta.start} ~ ${meta.end}<br>선택 주차 기준`;
-  $('period-current').innerHTML = currentText;
-  $('header-period').textContent = `${meta.start} ~ ${meta.end} · ${meta.mo}월 ${meta.wk}주차`;
+  setHtmlIfExists('period-current', `${meta.start} ~ ${meta.end}<br>선택 주차 기준`);
+  setTextIfExists('header-period', `${meta.start} ~ ${meta.end} · ${meta.mo}월 ${meta.wk}주차`);
 
-  $('period-prev-month').innerHTML = prevMoMeta
-    ? `${prevMoMeta.start} ~ ${prevMoMeta.end}<br>전월 같은 주차`
-    : '비교 데이터 없음';
+  setHtmlIfExists(
+    'period-prev-month',
+    prevMoMeta ? `${prevMoMeta.start} ~ ${prevMoMeta.end}<br>전월 같은 주차` : '비교 데이터 없음'
+  );
 
-  $('period-prev-year').innerHTML = prevYrMeta
-    ? `${prevYrMeta.start} ~ ${prevYrMeta.end}<br>전년 같은 기간`
-    : '비교 데이터 없음';
+  setHtmlIfExists(
+    'period-prev-year',
+    prevYrMeta ? `${prevYrMeta.start} ~ ${prevYrMeta.end}<br>전년 같은 기간` : '비교 데이터 없음'
+  );
 }
 
-function renderKpiCards(cur, prevMo, prevYr, trendKeys, store, team) {
+function renderKpiCards(cur, prevMo, prevYr) {
   const grid = $('kpi-grid');
+  if (!grid) return;
 
   grid.innerHTML = METRICS.map(key => {
     const def = METRIC_DEFS[key];
 
-    const trendValues = trendKeys.map(weekKey => {
-      return sumRows(getRowsByWeekKey(weekKey, store, team))[key];
-    });
-
     return `
-      <article class="kpi-card ${def.groupKey}" data-metric="${key}">
+      <article class="kpi-card ${def.groupKey}" data-metric="${key}" tabindex="0" role="button" aria-label="${def.label} 상세 보기">
         <div class="kpi-top">
-          <div class="kpi-icon">${def.icon}</div>
-          <div>
-            <h3 class="kpi-title">${def.label}</h3>
-            <div class="kpi-group">${def.group}</div>
+          <div class="kpi-head-left">
+            <div class="kpi-icon">${def.icon}</div>
+            <div>
+              <h3 class="kpi-title">${def.label}</h3>
+              <div class="kpi-group">${def.group}</div>
+            </div>
           </div>
+          <div class="kpi-chip">${def.chip}</div>
         </div>
 
         <div class="kpi-value">${fmt(cur[key])}</div>
@@ -405,14 +807,18 @@ function renderKpiCards(cur, prevMo, prevYr, trendKeys, store, team) {
           ${rateHtml(cur[key], prevMo ? prevMo[key] : null, def.higher, '전월 동기')}
           ${rateHtml(cur[key], prevYr ? prevYr[key] : null, def.higher, '전년 동기')}
         </div>
-
-        ${createSparkline(trendValues, def.groupKey)}
       </article>
     `;
   }).join('');
 
-  document.querySelectorAll('.kpi-card').forEach(card => {
+  document.querySelectorAll('#kpi-grid .kpi-card').forEach(card => {
     card.addEventListener('click', () => openKpiModal(card.dataset.metric));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openKpiModal(card.dataset.metric);
+      }
+    });
   });
 }
 
@@ -461,8 +867,10 @@ function chartBaseOptions() {
 }
 
 function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
-  const trendMetric = $('trendMetricSelect').value;
-  const compareMetric = $('compareMetricSelect').value;
+  if (!window.Chart) return;
+
+  const trendMetric = $('trendMetricSelect')?.value || 'views';
+  const compareMetric = $('compareMetricSelect')?.value || 'views';
 
   const trendLabels = trendKeys.map(key => weekMeta[key].short);
   const trendValues = trendKeys.map(key => sumRows(getRowsByWeekKey(key, store, team))[trendMetric]);
@@ -473,7 +881,7 @@ function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
     data: {
       labels: trendLabels,
       datasets: [{
-        label: METRIC_DEFS[trendMetric].label,
+        label: METRIC_DEFS[trendMetric]?.label || '조회수',
         data: trendValues,
         borderColor: '#ff7a00',
         backgroundColor: 'rgba(255, 122, 0, .18)',
@@ -487,12 +895,16 @@ function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
     options: chartBaseOptions()
   });
 
+  const exposureTotal = cur.views + cur.res_in;
+  const convertTotal = cur.conn + cur.res_req;
+  const manageTotal = cur.miss + cur.review + cur.neg_review + cur.chat;
+
   makeChart('chart-groups', {
     type: 'doughnut',
     data: {
       labels: ['노출 관련 지표', '전환 관련 지표', '관리 관련 지표'],
       datasets: [{
-        data: [2, 2, 3],
+        data: hasAnyData(cur) ? [exposureTotal, convertTotal, manageTotal] : [2, 2, 4],
         backgroundColor: ['#ff7a00', '#38a7ff', '#35d07f'],
         borderWidth: 0
       }]
@@ -532,7 +944,7 @@ function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
     data: {
       labels: ['당월 / 당주', '전월 동기', '전년 동기'],
       datasets: [{
-        label: METRIC_DEFS[compareMetric].label,
+        label: METRIC_DEFS[compareMetric]?.label || '조회수',
         data: [
           cur[compareMetric] || 0,
           prevMo ? prevMo[compareMetric] || 0 : 0,
@@ -548,6 +960,8 @@ function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
 
 function renderDetailTable(rows) {
   const tbody = $('detail-tbody');
+  if (!tbody) return;
+
   const total = sumRows(rows);
 
   const html = rows.map(r => `
@@ -580,8 +994,11 @@ function renderDetailTable(rows) {
 }
 
 function renderInsight(cur, prevMo) {
+  const insightEl = $('weekly-insight');
+  if (!insightEl) return;
+
   if (!prevMo || !hasAnyData(prevMo)) {
-    $('weekly-insight').textContent = '비교 가능한 전월 동기 데이터가 없어 이번 주 성과만 표시하고 있습니다.';
+    insightEl.textContent = '비교 가능한 전월 동기 데이터가 없어 이번 주 성과만 표시하고 있습니다.';
     return;
   }
 
@@ -608,13 +1025,19 @@ function renderInsight(cur, prevMo) {
     messages.push('미연결콜은 줄어 응대 관리 측면에서 긍정적입니다.');
   }
 
-  $('weekly-insight').textContent = messages.join(' ') || '이번 주 핵심 지표를 확인해보세요.';
+  insightEl.textContent = messages.join(' ') || '이번 주 핵심 지표를 확인해보세요.';
 }
 
 function renderDashboard() {
-  const weekKey = $('sel-week').value;
-  const store = $('sel-store').value;
-  const team = $('sel-team').value;
+  const selWeek = $('sel-week');
+  const selStore = $('sel-store');
+  const selTeam = $('sel-team');
+
+  if (!selWeek || !selStore || !selTeam) return;
+
+  const weekKey = selWeek.value;
+  const store = selStore.value || 'ALL';
+  const team = selTeam.value || 'ALL';
   const meta = weekMeta[weekKey];
 
   if (!meta) return;
@@ -636,376 +1059,198 @@ function renderDashboard() {
 
   lastRenderData = {
     meta,
+    curRows,
     curSum,
     prevMoSum,
     prevYrSum
   };
 
   renderPeriodCards(meta, prevMoMeta, prevYrMeta);
-  renderKpiCards(curSum, prevMoSum, prevYrSum, trendKeys, store, team);
+  renderKpiCards(curSum, prevMoSum, prevYrSum);
   renderCharts(curSum, prevMoSum, prevYrSum, trendKeys, store, team);
   renderDetailTable(curRows);
   renderInsight(curSum, prevMoSum);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KPI 모달
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ensureKpiModal() {
+  let modal = $('kpiModal');
+
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kpiModal';
+    document.body.appendChild(modal);
+  }
+
+  modal.className = 'kpi-modal';
+  modal.hidden = true;
+  modal.style.display = 'none';
+
+  modal.innerHTML = `
+    <div class="kpi-modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="kpi-modal-head">
+        <div>
+          <div id="modalGroup" class="kpi-modal-group">지표 상세</div>
+          <h2 id="modalTitle" class="kpi-modal-title">-</h2>
+        </div>
+        <button id="modalCloseBtn" class="kpi-modal-close" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <div id="modalValue" class="kpi-modal-value">-</div>
+
+      <div class="kpi-modal-compare">
+        <div class="kpi-modal-box">
+          <span class="kpi-modal-box-label">전월 동기</span>
+          <span id="modalPrevMonth" class="kpi-modal-box-value">-</span>
+          <span id="modalPrevMonthRate" class="kpi-modal-box-rate">-</span>
+        </div>
+
+        <div class="kpi-modal-box">
+          <span class="kpi-modal-box-label">전년 동기</span>
+          <span id="modalPrevYear" class="kpi-modal-box-value">-</span>
+          <span id="modalPrevYearRate" class="kpi-modal-box-rate">-</span>
+        </div>
+      </div>
+
+      <p id="modalDesc" class="kpi-modal-desc">-</p>
+    </div>
+  `;
+
+  const closeBtn = $('modalCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', closeKpiModal);
+
+  modal.addEventListener('click', e => {
+    if (e.target === modal) closeKpiModal();
+  });
 }
 
 function openKpiModal(metricKey) {
   if (!lastRenderData) return;
 
   const def = METRIC_DEFS[metricKey];
+  if (!def) return;
+
   const cur = lastRenderData.curSum;
   const prevMo = lastRenderData.prevMoSum;
   const prevYr = lastRenderData.prevYrSum;
 
-  $('modalGroup').textContent = def.group;
-  $('modalTitle').textContent = def.label;
-  $('modalValue').textContent = fmt(cur[metricKey]);
-  $('modalPrevMonth').textContent = prevMo ? fmt(prevMo[metricKey]) : '-';
-  $('modalPrevYear').textContent = prevYr ? fmt(prevYr[metricKey]) : '-';
+  const currentValue = fmt(cur[metricKey]);
+  const prevMonthValue = prevMo ? fmt(prevMo[metricKey]) : '-';
+  const prevYearValue = prevYr ? fmt(prevYr[metricKey]) : '-';
 
   const moRate = prevMo ? deltaRate(cur[metricKey], prevMo[metricKey], def.higher) : null;
   const yrRate = prevYr ? deltaRate(cur[metricKey], prevYr[metricKey], def.higher) : null;
 
-  $('modalPrevMonthRate').innerHTML = moRate
-    ? `<span class="${moRate.good ? 'rate-up' : 'rate-down'}">${moRate.value >= 0 ? '↑' : '↓'} ${Math.abs(moRate.value).toFixed(1)}%</span>`
-    : '<span class="rate-flat">비교 불가</span>';
+  const moRateHtml = moRate
+    ? `<span class="${moRate.good ? 'rate-up' : 'rate-down'}">${moRate.value >= 0 ? '▲' : '▼'} ${Math.abs(moRate.value).toFixed(1)}%</span>`
+    : `<span class="rate-flat">비교 불가</span>`;
 
-  $('modalPrevYearRate').innerHTML = yrRate
-    ? `<span class="${yrRate.good ? 'rate-up' : 'rate-down'}">${yrRate.value >= 0 ? '↑' : '↓'} ${Math.abs(yrRate.value).toFixed(1)}%</span>`
-    : '<span class="rate-flat">비교 불가</span>';
+  const yrRateHtml = yrRate
+    ? `<span class="${yrRate.good ? 'rate-up' : 'rate-down'}">${yrRate.value >= 0 ? '▲' : '▼'} ${Math.abs(yrRate.value).toFixed(1)}%</span>`
+    : `<span class="rate-flat">비교 불가</span>`;
 
-  $('modalDesc').textContent = def.desc;
+  setTextIfExists('modalGroup', def.group);
+  setTextIfExists('modalTitle', def.label);
+  setTextIfExists('modalValue', currentValue);
+  setTextIfExists('modalPrevMonth', prevMonthValue);
+  setTextIfExists('modalPrevYear', prevYearValue);
+  setHtmlIfExists('modalPrevMonthRate', moRateHtml);
+  setHtmlIfExists('modalPrevYearRate', yrRateHtml);
+  setTextIfExists('modalDesc', def.desc);
 
-  $('kpiModal').hidden = false;
+  const modal = $('kpiModal');
+  if (!modal) return;
+
+  modal.hidden = false;
+  modal.style.display = 'grid';
+  modal.classList.add('is-open');
   document.body.style.overflow = 'hidden';
 }
 
 function closeKpiModal() {
-  $('kpiModal').hidden = true;
+  const modal = $('kpiModal');
+  if (!modal) return;
+
+  modal.hidden = true;
+  modal.style.display = 'none';
+  modal.classList.remove('is-open');
   document.body.style.overflow = '';
 }
 
-async function loadData(forceFresh = false) {
-  const data = await fetchJsonWithCache(DATA_URL, 'tna_place_dashboard_rows_v3', 5 * 60 * 1000, forceFresh);
-  const rows = normalizeRows(data);
-
-  RAW.length = 0;
-  rows.forEach(row => RAW.push(row));
-
-  rebuildMetaFromRaw();
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// 새로고침 / 초기 실행
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function refreshData() {
   const btn = $('refreshBtn');
-  const originalText = btn.textContent;
+  const originalText = btn ? btn.textContent : '';
 
   try {
-    btn.disabled = true;
-    btn.textContent = '불러오는 중...';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '불러오는 중...';
+    }
 
     await loadData(true);
     initSelects();
     renderDashboard();
 
-    $('empty-state').hidden = true;
+    if ($('empty-state')) $('empty-state').hidden = true;
   } catch (e) {
     console.error(e);
-    $('empty-state').hidden = false;
+    if ($('empty-state')) {
+      $('empty-state').hidden = false;
+      $('empty-state').textContent = '데이터를 불러오지 못했습니다. Apps Script 배포 URL 또는 데이터 형식을 확인해주세요.';
+    }
   } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 }
 
 async function init() {
-  $('modalCloseBtn').addEventListener('click', closeKpiModal);
-
-  $('kpiModal').addEventListener('click', e => {
-    if (e.target.id === 'kpiModal') closeKpiModal();
-  });
+  injectRuntimeCss();
+  ensureKpiModal();
+  closeKpiModal();
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeKpiModal();
   });
 
-  $('refreshBtn').addEventListener('click', refreshData);
+  const refreshBtn = $('refreshBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshData);
 
   try {
     await loadData(false);
 
     if (!RAW.length) {
-      $('empty-state').hidden = false;
+      if ($('empty-state')) {
+        $('empty-state').hidden = false;
+        $('empty-state').textContent = '표시할 데이터가 없습니다. Apps Script 응답 데이터와 시트 컬럼명을 확인해주세요.';
+      }
       return;
     }
 
     initSelects();
     renderDashboard();
-    $('empty-state').hidden = true;
+
+    if ($('empty-state')) $('empty-state').hidden = true;
+    closeKpiModal();
   } catch (e) {
     console.error(e);
-    $('empty-state').hidden = false;
+
+    if ($('empty-state')) {
+      $('empty-state').hidden = false;
+      $('empty-state').textContent = '데이터를 불러오지 못했습니다. Apps Script 배포 URL 또는 데이터 형식을 확인해주세요.';
+    }
+
+    closeKpiModal();
   }
 }
 
 document.addEventListener('DOMContentLoaded', init);
-// ─────────────────────────────────────────────
-// KPI 모달 강제 수정 코드
-// 사이트 첫 진입 시 모달 숨김 + 닫기 버튼 정상 작동
-// ─────────────────────────────────────────────
-
-function hideKpiModal() {
-  const modal = document.getElementById('kpiModal');
-  if (!modal) return;
-
-  modal.setAttribute('hidden', '');
-  modal.style.display = 'none';
-  document.body.style.overflow = '';
-}
-
-function showKpiModal() {
-  const modal = document.getElementById('kpiModal');
-  if (!modal) return;
-
-  modal.removeAttribute('hidden');
-  modal.style.display = 'grid';
-  document.body.style.overflow = 'hidden';
-}
-
-// 기존 openKpiModal 덮어쓰기
-window.openKpiModal = function (data) {
-  const title = document.getElementById('kpiModalTitle');
-  const value = document.getElementById('kpiModalValue');
-  const prevMonth = document.getElementById('kpiModalPrevMonth');
-  const prevYear = document.getElementById('kpiModalPrevYear');
-  const deltaMonth = document.getElementById('kpiModalDeltaMonth');
-  const deltaYear = document.getElementById('kpiModalDeltaYear');
-
-  if (title) title.textContent = data.title || '-';
-  if (value) value.textContent = data.current || '-';
-  if (prevMonth) prevMonth.textContent = data.prevMonth || '-';
-  if (prevYear) prevYear.textContent = data.prevYear || '-';
-  if (deltaMonth) deltaMonth.textContent = data.deltaMonth || '-';
-  if (deltaYear) deltaYear.textContent = data.deltaYear || '-';
-
-  showKpiModal();
-};
-
-// 기존 closeKpiModal 덮어쓰기
-window.closeKpiModal = function () {
-  hideKpiModal();
-};
-
-// 페이지 로딩 직후 무조건 모달 숨기기
-window.addEventListener('load', function () {
-  hideKpiModal();
-
-  const modal = document.getElementById('kpiModal');
-  if (!modal) return;
-
-  const closeBtn = modal.querySelector('.modal-close, .kpi-modal-close, button[aria-label="닫기"], button');
-
-  if (closeBtn) {
-    closeBtn.onclick = function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      hideKpiModal();
-    };
-  }
-
-  modal.addEventListener('click', function (e) {
-    if (e.target === modal) {
-      hideKpiModal();
-    }
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      hideKpiModal();
-    }
-  });
-});
-
-const KPI_DEFS = [
-  {
-    key: 'views',
-    label: '플레이스 조회수',
-    sub: '노출 관련 지표',
-    chip: '노출',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
-  },
-  {
-    key: 'conn',
-    label: '연결콜',
-    sub: '전환 관련 지표',
-    chip: '전환',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.84a16 16 0 0 0 6 6l.93-.93a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z"/></svg>`
-  },
-  {
-    key: 'miss',
-    label: '미연결콜',
-    sub: '관리 관련 지표',
-    chip: '관리',
-    higher: false,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h11"/></svg>`
-  },
-  {
-    key: 'res_in',
-    label: '예약유입',
-    sub: '노출 관련 지표',
-    chip: '노출',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`
-  },
-  {
-    key: 'res_req',
-    label: '예약신청',
-    sub: '전환 관련 지표',
-    chip: '전환',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
-  },
-  {
-    key: 'review',
-    label: '리뷰',
-    sub: '관리 관련 지표',
-    chip: '관리',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
-  },
-  {
-    key: 'neg_review',
-    label: '부정리뷰',
-    sub: '관리 관련 지표',
-    chip: '관리',
-    higher: false,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
-  },
-  {
-    key: 'chat',
-    label: '톡톡상담',
-    sub: '관리 관련 지표',
-    chip: '관리',
-    higher: true,
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`
-  }
-];
-
-function rateClassText(rate) {
-  if (!rate) return { cls: 'rate-flat', text: '—' };
-  const arrow = rate.d > 0 ? '▲' : rate.d < 0 ? '▼' : '';
-  const cls = rate.good ? 'rate-up' : 'rate-dn';
-  return { cls, text: `${arrow}${Math.abs(rate.d).toFixed(1)}%` };
-}
-
-function safeNumberText(v) {
-  return v === null || v === undefined ? '—' : num(v).toLocaleString();
-}
-
-function renderKPI(cur, prevMo, prevYr) {
-  const grid = $('kpi-grid');
-  if (!grid) return;
-
-  grid.innerHTML = KPI_DEFS.map(def => {
-    const v = cur?.[def.key] ?? 0;
-    const pm = prevMo?.[def.key] ?? 0;
-    const py = prevYr?.[def.key] ?? 0;
-
-    const rMo = calcRate(v, pm, def.higher);
-    const rPy = calcRate(v, py, def.higher);
-
-    const moRate = rateClassText(rMo);
-    const pyRate = rateClassText(rPy);
-
-    return `
-      <div class="kpi-card-simple"
-        data-title="${def.label}"
-        data-current="${safeNumberText(v)}"
-        data-prev-month="${safeNumberText(pm)}"
-        data-prev-year="${safeNumberText(py)}"
-        data-delta-month="${moRate.text}"
-        data-delta-year="${pyRate.text}">
-        
-        <div class="kpi-card-head">
-          <div class="kpi-head-left">
-            <div class="kpi-icon-circle">${def.icon}</div>
-            <div class="kpi-title-wrap">
-              <div class="kpi-title">${def.label}</div>
-              <div class="kpi-sub">${def.sub}</div>
-            </div>
-          </div>
-          <div class="kpi-chip">${def.chip}</div>
-        </div>
-
-        <div class="kpi-big-value">${safeNumberText(v)}</div>
-
-        <div class="kpi-compare-boxes">
-          <div class="kpi-compare-mini">
-            <span class="mini-label">전월 동기</span>
-            <span class="mini-value">${safeNumberText(pm)}</span>
-            <span class="mini-rate ${moRate.cls}">${moRate.text}</span>
-          </div>
-          <div class="kpi-compare-mini">
-            <span class="mini-label">전년 동기</span>
-            <span class="mini-value">${safeNumberText(py)}</span>
-            <span class="mini-rate ${pyRate.cls}">${pyRate.text}</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  bindKpiCardEvents();
-}
-
-function openKpiModal(data) {
-  const modal = $('kpiModal');
-  if (!modal) return;
-
-  if ($('kpiModalTitle')) $('kpiModalTitle').textContent = data.title || '-';
-  if ($('kpiModalValue')) $('kpiModalValue').textContent = data.current || '-';
-  if ($('kpiModalPrevMonth')) $('kpiModalPrevMonth').textContent = data.prevMonth || '-';
-  if ($('kpiModalPrevYear')) $('kpiModalPrevYear').textContent = data.prevYear || '-';
-  if ($('kpiModalDeltaMonth')) $('kpiModalDeltaMonth').textContent = data.deltaMonth || '-';
-  if ($('kpiModalDeltaYear')) $('kpiModalDeltaYear').textContent = data.deltaYear || '-';
-
-  modal.hidden = false;
-  document.body.style.overflow = 'hidden';
-}
-
-function closeKpiModal() {
-  const modal = $('kpiModal');
-  if (!modal) return;
-  modal.hidden = true;
-  document.body.style.overflow = '';
-}
-
-function bindKpiCardEvents() {
-  document.querySelectorAll('#kpi-grid .kpi-card-simple').forEach(card => {
-    card.onclick = function () {
-      openKpiModal({
-        title: card.dataset.title || '-',
-        current: card.dataset.current || '-',
-        prevMonth: card.dataset.prevMonth || '-',
-        prevYear: card.dataset.prevYear || '-',
-        deltaMonth: card.dataset.deltaMonth || '-',
-        deltaYear: card.dataset.deltaYear || '-'
-      });
-    };
-  });
-}
-
-document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') closeKpiModal();
-});
-
-document.addEventListener('click', function (e) {
-  const modal = $('kpiModal');
-  if (!modal) return;
-  if (e.target === modal) closeKpiModal();
-});
-
-document.addEventListener('DOMContentLoaded', function () {
-  const modal = $('kpiModal');
-  if (modal) modal.hidden = true;
-});
