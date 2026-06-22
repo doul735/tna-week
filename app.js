@@ -1,27 +1,100 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// TNA 대시보드 전체 교체용 JS
-// 기존 <script> 안의 JS를 전부 삭제하고 이 코드로 교체하세요.
-// 데이터는 Apps Script 웹앱 URL에서 불러옵니다.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─── 데이터 URL ──────────────────────────────────────────────────────────────
 const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_TCR45muWiseITDdxHo_sYPKYxLS5CgRi_1LCouEgrapDkMQ7VE-HAj8zURoI2Uc/exec';
-const TIRE_DATA_URL = DATA_URL + '?type=tire';
 
-// 내장 데이터는 비워둡니다. 구글시트 연동 실패 시 화면에 안내를 표시합니다.
 const RAW = [];
-let TNA = makeEmptyTna();
-let TNA_LIVE_ROWS = [];
 
-// ─── 공통 유틸 ───────────────────────────────────────────────────────────────
+let weekMeta = {};
+let weekKeys = [];
+let monthKeys = [];
+let STORES = [];
+let TEAMS = [];
+
+let charts = {};
+let lastRenderData = null;
+
+const METRICS = ['views', 'conn', 'miss', 'res_in', 'res_req', 'review', 'chat'];
+
+const METRIC_DEFS = {
+  views: {
+    label: '플레이스 조회수',
+    group: '노출 관련 지표',
+    groupKey: 'exposure',
+    icon: '◎',
+    higher: true,
+    desc: '네이버 플레이스에서 매장이 얼마나 많이 조회되었는지 확인하는 핵심 노출 지표입니다.'
+  },
+  conn: {
+    label: '연결콜',
+    group: '전환 관련 지표',
+    groupKey: 'convert',
+    icon: '☎',
+    higher: true,
+    desc: '고객이 실제로 전화 연결까지 이어진 수치입니다. 문의 전환 흐름을 확인할 수 있습니다.'
+  },
+  miss: {
+    label: '미연결콜',
+    group: '관리 관련 지표',
+    groupKey: 'manage',
+    icon: '×',
+    higher: false,
+    desc: '연결되지 못한 전화입니다. 낮아질수록 응대 관리가 개선된 것으로 볼 수 있습니다.'
+  },
+  res_in: {
+    label: '예약유입',
+    group: '노출 관련 지표',
+    groupKey: 'exposure',
+    icon: '↗',
+    higher: true,
+    desc: '예약 화면까지 유입된 고객 수입니다. 관심 고객의 행동 흐름을 볼 수 있습니다.'
+  },
+  res_req: {
+    label: '예약신청',
+    group: '전환 관련 지표',
+    groupKey: 'convert',
+    icon: '▣',
+    higher: true,
+    desc: '실제 예약 신청까지 이어진 수치입니다. 예약 전환 성과를 보는 핵심 지표입니다.'
+  },
+  review: {
+    label: '리뷰',
+    group: '관리 관련 지표',
+    groupKey: 'manage',
+    icon: '☆',
+    higher: true,
+    desc: '고객 리뷰 발생 수입니다. 매장 신뢰도와 운영 관리 상태를 함께 보여주는 지표입니다.'
+  },
+  chat: {
+    label: '톡톡상담',
+    group: '관리 관련 지표',
+    groupKey: 'manage',
+    icon: '●',
+    higher: true,
+    desc: '네이버 톡톡 상담 수치입니다. 전화 외 문의 채널의 반응을 확인할 수 있습니다.'
+  }
+};
+
 function $(id) {
   return document.getElementById(id);
 }
 
-function makeEmptyTna() {
-  const monthly = {};
-  for (let m = 1; m <= 12; m += 1) monthly[m] = { qty: 0, amt: 0 };
-  return { stores: [], monthly };
+function num(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  return Number(String(value).replace(/,/g, '')) || 0;
+}
+
+function fmt(value) {
+  return num(value).toLocaleString();
+}
+
+function toDateString(value) {
+  if (!value) return '';
+
+  if (typeof value === 'number') {
+    const base = new Date(1899, 11, 30);
+    base.setDate(base.getDate() + value);
+    return base.toISOString().split('T')[0];
+  }
+
+  return String(value).split('T')[0];
 }
 
 function cacheBustUrl(url) {
@@ -36,19 +109,22 @@ async function fetchJsonWithCache(url, cacheKey, ttlMs = 5 * 60 * 1000, forceFre
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.ts && now - parsed.ts < ttlMs) return parsed.data;
+        if (parsed && parsed.ts && now - parsed.ts < ttlMs) {
+          return parsed.data;
+        }
       }
     } catch (e) {
       console.warn('캐시 읽기 실패:', e);
     }
   }
 
-  const res = await fetch(forceFresh ? cacheBustUrl(url) : url, { cache: 'no-store' });
+  const res = await fetch(forceFresh ? cacheBustUrl(url) : url);
   if (!res.ok) throw new Error('데이터 요청 실패: ' + res.status);
+
   const data = await res.json();
 
   try {
-    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+    localStorage.setItem(cacheKey, JSON.stringify({ ts: now, data }));
   } catch (e) {
     console.warn('캐시 저장 실패:', e);
   }
@@ -56,1153 +132,618 @@ async function fetchJsonWithCache(url, cacheKey, ttlMs = 5 * 60 * 1000, forceFre
   return data;
 }
 
-function ensureXlsx() {
-  if (window.XLSX) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('엑셀 라이브러리 로딩 실패'));
-    document.head.appendChild(script);
-  });
-}
+function normalizeRows(data) {
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
 
-function num(v) {
-  if (v === null || v === undefined || v === '') return 0;
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  const n = Number(String(v).replace(/,/g, '').trim());
-  return Number.isFinite(n) ? n : 0;
-}
-
-function text(v) {
-  return v === null || v === undefined ? '' : String(v).trim();
-}
-
-function dateText(v) {
-  if (!v) return '';
-  if (typeof v === 'number') {
-    const base = new Date(1899, 11, 30);
-    const d = new Date(base);
-    d.setDate(base.getDate() + v);
-    return d.toISOString().slice(0, 10);
-  }
-  const s = String(v).trim();
-  if (!s) return '';
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-  return s.split('T')[0];
-}
-
-function formatMoneyWon(v) {
-  return num(v).toLocaleString();
-}
-
-function showStatus(msg, isError = false) {
-  const targets = ['period-display', 'mo-table-title', 'tna-table-title'];
-  targets.forEach(id => {
-    const el = $(id);
-    if (el && !el.dataset.locked) el.textContent = msg;
-  });
-  if (isError) console.warn(msg);
-}
-
-function hasAnyValue(row) {
-  return METRICS.some(k => num(row[k]) > 0);
-}
-
-function hasAnyMonthValue(rows) {
-  return rows.some(hasAnyValue);
-}
-
-function hasChart() {
-  return Boolean(window.Chart);
-}
-
-// ─── RAW 메타데이터 ──────────────────────────────────────────────────────────
-let weekMeta = {};
-let weekKeys = [];
-let STORES = [];
-let TEAMS = [];
-
-const METRICS = ['views', 'conn', 'miss', 'res_in', 'res_req', 'review', 'chat'];
-
-function normalizePlaceRow(r) {
-  return {
-    yr: num(r['년'] ?? r.yr ?? r.year),
-    mo: num(r['월'] ?? r.mo ?? r.month),
-    wk: num(r['주'] ?? r['주차'] ?? r.wk ?? r.week),
-    start: dateText(r['시작일(월)'] ?? r['시작일'] ?? r.start ?? r.start_date),
-    end: dateText(r['종료일(일)'] ?? r['종료일'] ?? r.end ?? r.end_date),
-    store: text(r['매장명'] ?? r.store ?? r.store_name),
-    team: text(r['팀'] ?? r.team),
+  return rows.map(r => ({
+    yr: num(r['년'] ?? r.yr),
+    mo: num(r['월'] ?? r.mo),
+    wk: num(r['주'] ?? r.wk),
+    start: toDateString(r['시작일(월)'] ?? r.start),
+    end: toDateString(r['종료일(일)'] ?? r.end),
+    store: String(r['매장명'] ?? r.store ?? '').trim(),
+    team: String(r['팀'] ?? r.team ?? '').trim(),
     views: num(r['조회수'] ?? r.views),
     conn: num(r['연결콜'] ?? r.conn),
     miss: num(r['미연결콜'] ?? r.miss),
-    res_in: num(r['예약유입'] ?? r.res_in ?? r.resIn),
-    res_req: num(r['예약신청'] ?? r.res_req ?? r.resReq),
+    res_in: num(r['예약유입'] ?? r.res_in),
+    res_req: num(r['예약신청'] ?? r.res_req),
     review: num(r['리뷰'] ?? r.review),
-    chat: num(r['톡톡상담'] ?? r.chat),
-  };
+    chat: num(r['톡톡상담'] ?? r.chat)
+  })).filter(r => r.yr && r.mo && r.wk && r.store);
 }
 
 function rebuildMetaFromRaw() {
   weekMeta = {};
 
   RAW.forEach(r => {
-    if (!r.yr || !r.mo || !r.wk) return;
     const key = `${r.yr}-${r.mo}-${r.wk}`;
+
     if (!weekMeta[key]) {
       weekMeta[key] = {
+        key,
         yr: r.yr,
         mo: r.mo,
         wk: r.wk,
         start: r.start,
         end: r.end,
         label: `${r.yr}년 ${r.mo}월 ${r.wk}주차`,
-        short: `${r.mo}월${r.wk}주`,
+        short: `${r.mo}월 ${r.wk}주`
       };
     }
   });
 
   weekKeys = Object.keys(weekMeta).sort((a, b) => {
-    const A = weekMeta[a];
-    const B = weekMeta[b];
-    return (A.yr - B.yr) || (A.mo - B.mo) || (A.wk - B.wk);
+    return new Date(weekMeta[a].start) - new Date(weekMeta[b].start);
   });
+
+  monthKeys = [...new Set(RAW.map(r => `${r.yr}-${r.mo}`))]
+    .sort((a, b) => {
+      const [ay, am] = a.split('-').map(Number);
+      const [by, bm] = b.split('-').map(Number);
+      return ay === by ? am - bm : ay - by;
+    });
 
   STORES = [...new Set(RAW.map(r => r.store).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   TEAMS = [...new Set(RAW.map(r => r.team).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
 }
 
-function getRows(yr, mo, wk, store = 'ALL', team = 'ALL') {
+function sumRows(rows) {
+  const result = {
+    views: 0,
+    conn: 0,
+    miss: 0,
+    res_in: 0,
+    res_req: 0,
+    review: 0,
+    chat: 0
+  };
+
+  rows.forEach(row => {
+    METRICS.forEach(key => {
+      result[key] += num(row[key]);
+    });
+  });
+
+  return result;
+}
+
+function hasAnyData(sum) {
+  return METRICS.some(key => num(sum[key]) > 0);
+}
+
+function getRowsByWeekKey(weekKey, store = 'ALL', team = 'ALL') {
+  const meta = weekMeta[weekKey];
+  if (!meta) return [];
+
   return RAW.filter(r =>
-    r.yr === yr && r.mo === mo && r.wk === wk &&
+    r.yr === meta.yr &&
+    r.mo === meta.mo &&
+    r.wk === meta.wk &&
     (store === 'ALL' || r.store === store) &&
     (team === 'ALL' || r.team === team)
   );
 }
 
-function sumRows(rows) {
-  const s = { views: 0, conn: 0, miss: 0, res_in: 0, res_req: 0, review: 0, chat: 0 };
-  rows.forEach(r => METRICS.forEach(m => { s[m] += num(r[m]); }));
-  return s;
-}
+function getRowsByMonthKey(monthKey, store = 'ALL', team = 'ALL') {
+  const [yr, mo] = monthKey.split('-').map(Number);
 
-function getLatestUsefulWeekKey() {
-  for (let i = weekKeys.length - 1; i >= 0; i -= 1) {
-    const m = weekMeta[weekKeys[i]];
-    const rows = getRows(m.yr, m.mo, m.wk);
-    if (rows.some(hasAnyValue)) return weekKeys[i];
-  }
-  return weekKeys[weekKeys.length - 1] || '';
+  return RAW.filter(r =>
+    r.yr === yr &&
+    r.mo === mo &&
+    (store === 'ALL' || r.store === store) &&
+    (team === 'ALL' || r.team === team)
+  );
 }
 
 function prevMonthKey(yr, mo, wk) {
   let pmo = mo - 1;
   let pyr = yr;
-  if (pmo < 1) { pmo = 12; pyr -= 1; }
-  const k = `${pyr}-${pmo}-${wk}`;
-  return weekMeta[k] ? { yr: pyr, mo: pmo, wk } : null;
+
+  if (pmo < 1) {
+    pmo = 12;
+    pyr -= 1;
+  }
+
+  const key = `${pyr}-${pmo}-${wk}`;
+  return weekMeta[key] ? key : null;
 }
 
 function prevYearKey(yr, mo, wk) {
-  const k = `${yr - 1}-${mo}-${wk}`;
-  return weekMeta[k] ? { yr: yr - 1, mo, wk } : null;
+  const key = `${yr - 1}-${mo}-${wk}`;
+  return weekMeta[key] ? key : null;
 }
 
-// ─── 셀렉트 초기화 ───────────────────────────────────────────────────────────
-function setOptions(select, options, selectedValue) {
-  if (!select) return;
-  select.innerHTML = '';
-  options.forEach(opt => {
-    const o = document.createElement('option');
-    o.value = opt.value;
-    o.textContent = opt.label;
-    select.appendChild(o);
-  });
-  if (selectedValue && [...select.options].some(o => o.value === selectedValue)) {
-    select.value = selectedValue;
+function deltaRate(current, previous, higher = true) {
+  if (previous === null || previous === undefined || num(previous) === 0) return null;
+
+  const rate = ((num(current) - num(previous)) / num(previous)) * 100;
+
+  return {
+    value: rate,
+    good: higher ? rate >= 0 : rate <= 0
+  };
+}
+
+function rateHtml(current, previous, higher, label) {
+  const rate = deltaRate(current, previous, higher);
+
+  if (!rate) {
+    return `<span><span class="rate-label">${label}</span><span class="rate-flat">—</span></span>`;
   }
+
+  const arrow = rate.value > 0 ? '↑' : rate.value < 0 ? '↓' : '–';
+  const cls = rate.good ? 'rate-up' : 'rate-down';
+
+  return `<span><span class="rate-label">${label}</span><span class="${cls}">${arrow} ${Math.abs(rate.value).toFixed(1)}%</span></span>`;
+}
+
+function createSparkline(values, groupKey) {
+  const clean = values.map(num);
+  const max = Math.max(...clean, 1);
+  const min = Math.min(...clean);
+  const range = max - min || 1;
+
+  const points = clean.map((v, i) => {
+    const x = clean.length === 1 ? 100 : (i / (clean.length - 1)) * 100;
+    const y = 34 - ((v - min) / range) * 28;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  return `
+    <svg class="sparkline ${groupKey}" viewBox="0 0 100 44" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="${points}"></polyline>
+    </svg>
+  `;
 }
 
 function initSelects() {
+  const selStore = $('sel-store');
+  const selTeam = $('sel-team');
   const selWeek = $('sel-week');
-  const prevWeek = selWeek?.value || '';
-  const weekOptions = weekKeys.map(k => {
-    const m = weekMeta[k];
-    return { value: k, label: `${m.label}  (${m.start} ~ ${m.end})` };
+  const selMonth = $('sel-month');
+
+  selStore.innerHTML = '<option value="ALL">전체 매장</option>';
+  STORES.forEach(store => {
+    selStore.innerHTML += `<option value="${store}">${store}</option>`;
   });
-  setOptions(selWeek, weekOptions, prevWeek || getLatestUsefulWeekKey());
-  if (selWeek && !selWeek.value && weekKeys.length) selWeek.value = getLatestUsefulWeekKey();
 
-  setOptions($('sel-store'), [{ value: 'ALL', label: '전체 매장' }, ...STORES.map(s => ({ value: s, label: s }))], $('sel-store')?.value || 'ALL');
-  setOptions($('sel-team'), [{ value: 'ALL', label: '전체 팀' }, ...TEAMS.map(t => ({ value: t, label: t }))], $('sel-team')?.value || 'ALL');
-}
+  selTeam.innerHTML = '<option value="ALL">전체 팀</option>';
+  TEAMS.forEach(team => {
+    selTeam.innerHTML += `<option value="${team}">${team}</option>`;
+  });
 
-// ─── 구글 시트 연동 ──────────────────────────────────────────────────────────
-async function loadFromGoogleSheets(forceFresh = false) {
-  if (!DATA_URL) return false;
+  selWeek.innerHTML = '';
+  weekKeys.forEach(key => {
+    const m = weekMeta[key];
+    selWeek.innerHTML += `<option value="${key}">${m.start} ~ ${m.end} · ${m.label}</option>`;
+  });
 
-  try {
-    const payload = await fetchJsonWithCache(DATA_URL, 'tna_place_rows_v3', 5 * 60 * 1000, forceFresh);
-    const rows = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-    if (!rows.length) throw new Error(payload?.error || '플레이스 데이터가 비어 있습니다.');
+  selMonth.innerHTML = '';
+  monthKeys.forEach(key => {
+    const [yr, mo] = key.split('-').map(Number);
+    selMonth.innerHTML += `<option value="${key}">${yr}년 ${mo}월</option>`;
+  });
 
-    RAW.length = 0;
-    rows.map(normalizePlaceRow)
-      .filter(r => r.yr && r.mo && r.wk && r.store)
-      .forEach(r => RAW.push(r));
-
-    rebuildMetaFromRaw();
-    return true;
-  } catch (e) {
-    console.warn('구글 시트 연동 실패:', e);
-    return false;
+  const latestDataWeek = [...weekKeys].reverse().find(key => hasAnyData(sumRows(getRowsByWeekKey(key))));
+  if (latestDataWeek) {
+    selWeek.value = latestDataWeek;
+    const m = weekMeta[latestDataWeek];
+    selMonth.value = `${m.yr}-${m.mo}`;
+  } else if (weekKeys.length) {
+    selWeek.value = weekKeys[weekKeys.length - 1];
   }
+
+  selStore.onchange = renderDashboard;
+  selTeam.onchange = renderDashboard;
+  selWeek.onchange = () => {
+    const meta = weekMeta[selWeek.value];
+    if (meta && [...selMonth.options].some(o => o.value === `${meta.yr}-${meta.mo}`)) {
+      selMonth.value = `${meta.yr}-${meta.mo}`;
+    }
+    renderDashboard();
+  };
+
+  selMonth.onchange = () => {
+    const [yr, mo] = selMonth.value.split('-').map(Number);
+    const matchedWeeks = weekKeys.filter(key => {
+      const m = weekMeta[key];
+      return m.yr === yr && m.mo === mo;
+    });
+
+    const latestWeek = [...matchedWeeks].reverse().find(key => hasAnyData(sumRows(getRowsByWeekKey(key))));
+    if (latestWeek) {
+      selWeek.value = latestWeek;
+    } else if (matchedWeeks.length) {
+      selWeek.value = matchedWeeks[matchedWeeks.length - 1];
+    }
+
+    renderDashboard();
+  };
+
+  $('trendMetricSelect').onchange = renderDashboard;
+  $('compareMetricSelect').onchange = renderDashboard;
 }
 
-// ─── KPI 카드 ───────────────────────────────────────────────────────────────
-const KPI_GROUPS = [
-  {
-    id: 'exposure', label: '노출 지표', desc: '플레이스 노출 및 도달 성과',
-    icon: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  },
-  {
-    id: 'convert', label: '전환 지표', desc: '콜 연결 및 예약 전환 성과',
-    icon: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
-  },
-  {
-    id: 'manage', label: '관리 지표', desc: '미연결 개선 및 리뷰 관리 성과',
-    icon: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-  },
-];
+function renderPeriodCards(meta, prevMoMeta, prevYrMeta) {
+  const currentText = `${meta.start} ~ ${meta.end}<br>선택 주차 기준`;
+  $('period-current').innerHTML = currentText;
+  $('header-period').textContent = `${meta.start} ~ ${meta.end} · ${meta.mo}월 ${meta.wk}주차`;
 
-const KPI_DEFS = [
-  { key: 'views', label: '플레이스 조회수', cls: 'views', group: 'exposure', higher: true, icon: KPI_GROUPS[0].icon },
-  { key: 'res_in', label: '예약 유입', cls: 'resin', group: 'exposure', higher: true, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>` },
-  { key: 'conn', label: '연결콜', cls: 'conn', group: 'convert', higher: true, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.84a16 16 0 0 0 6 6l.93-.93a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z"/></svg>` },
-  { key: 'res_req', label: '예약 신청', cls: 'resreq', group: 'convert', higher: true, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` },
-  { key: 'chat', label: '톡톡 상담', cls: 'chat', group: 'convert', higher: true, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>` },
-  { key: 'miss', label: '미연결콜', cls: 'miss', group: 'manage', higher: false, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1.22M10.66 5H19a2 2 0 0 1 2 2v10.34M11 11a4 4 0 0 0 5.17 5.17"/></svg>` },
-  { key: 'review', label: '리뷰', cls: 'review', group: 'manage', higher: true, icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` },
-];
+  $('period-prev-month').innerHTML = prevMoMeta
+    ? `${prevMoMeta.start} ~ ${prevMoMeta.end}<br>전월 같은 주차`
+    : '비교 데이터 없음';
 
-function calcRate(v, ref, higher = true) {
-  if (ref === null || ref === undefined || ref === 0) return null;
-  const d = ((v - ref) / ref) * 100;
-  return { d, good: higher ? d >= 0 : d <= 0 };
+  $('period-prev-year').innerHTML = prevYrMeta
+    ? `${prevYrMeta.start} ~ ${prevYrMeta.end}<br>전년 같은 기간`
+    : '비교 데이터 없음';
 }
 
-function rateBadge(v, ref, higher, label) {
-  const r = calcRate(v, ref, higher);
-  if (!r) return `<span class="rate-item"><span class="rl">${label}</span><span class="rv rate-flat">—</span></span>`;
-  const cls = r.good ? 'rate-up' : 'rate-dn';
-  const arrow = r.d > 0 ? '▲' : r.d < 0 ? '▼' : '';
-  return `<span class="rate-item"><span class="rl">${label}</span><span class="rv ${cls}">${arrow}${Math.abs(r.d).toFixed(1)}%</span></span>`;
-}
-
-function metricMsg(def, rate, label) {
-  if (!rate) return '';
-  const abs = Math.abs(rate.d).toFixed(1);
-  if (def.key === 'miss') {
-    return rate.d < 0
-      ? `<div style="font-size:10px;color:var(--green);margin-top:6px;font-weight:600">${label} 미연결 개선 ▼${abs}%</div>`
-      : rate.d > 0 ? `<div style="font-size:10px;color:var(--red);margin-top:6px;font-weight:600">${label} 미연결 증가 ▲${abs}%</div>` : '';
-  }
-  if (def.key === 'conn') {
-    return rate.d > 0
-      ? `<div style="font-size:10px;color:var(--green);margin-top:6px;font-weight:600">${label} 연결콜 증가 ▲${abs}%</div>`
-      : rate.d < 0 ? `<div style="font-size:10px;color:var(--red);margin-top:6px;font-weight:600">${label} 연결콜 감소 ▼${abs}%</div>` : '';
-  }
-  return '';
-}
-
-function renderKPI(cur, prevMo, prevYr) {
+function renderKpiCards(cur, prevMo, prevYr, trendKeys, store, team) {
   const grid = $('kpi-grid');
-  if (!grid) return;
 
-  grid.innerHTML = KPI_GROUPS.map(grp => {
-    const defs = KPI_DEFS.filter(d => d.group === grp.id);
-    const curTotal = defs.reduce((s, d) => s + (cur[d.key] || 0), 0);
-    const prevTotal = prevMo ? defs.reduce((s, d) => s + (prevMo[d.key] || 0), 0) : 0;
-    const grpRate = prevTotal ? ((curTotal - prevTotal) / prevTotal) * 100 : null;
+  grid.innerHTML = METRICS.map(key => {
+    const def = METRIC_DEFS[key];
 
-    return `<div class="kpi-group-wrap">
-      <div class="kpi-group-header">
-        <span class="kpi-group-badge ${grp.id}">${grp.icon} ${grp.label}</span>
-        <span style="font-size:11px;color:var(--text3)">${grp.desc}</span>
-        <div class="kpi-group-divider"></div>
-        ${grpRate !== null ? `<div class="kpi-group-score">전월 대비 <span class="score-num" style="color:${grpRate >= 0 ? 'var(--green)' : 'var(--red)'}">${grpRate >= 0 ? '▲' : '▼'}${Math.abs(grpRate).toFixed(1)}%</span></div>` : ''}
-      </div>
-      <div class="kpi-grid" style="margin-bottom:0">
-        ${defs.map(def => {
-          const v = cur[def.key] || 0;
-          const pm = prevMo ? prevMo[def.key] : null;
-          const py = prevYr ? prevYr[def.key] : null;
-          const rMo = calcRate(v, pm, def.higher);
-          return `<div class="kpi-card ${def.cls}">
-            <div class="kpi-label">${def.icon} ${def.label}</div>
-            <div class="kpi-value">${v.toLocaleString()}</div>
-            <div class="kpi-compare">
-              <div class="kpi-compare-row"><span class="compare-label">전월 동기</span><span class="compare-val">${pm !== null && pm !== undefined ? pm.toLocaleString() : '—'}</span>${rateBadge(v, pm, def.higher, '')}</div>
-              <div class="kpi-compare-row"><span class="compare-label">전년 동기</span><span class="compare-val">${py !== null && py !== undefined ? py.toLocaleString() : '—'}</span>${rateBadge(v, py, def.higher, '')}</div>
-            </div>
-            <div class="rate-row">${rateBadge(v, pm, def.higher, '전월')}${rateBadge(v, py, def.higher, '전년')}</div>
-            ${metricMsg(def, rMo, '전월 대비')}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
+    const trendValues = trendKeys.map(weekKey => {
+      return sumRows(getRowsByWeekKey(weekKey, store, team))[key];
+    });
+
+    return `
+      <article class="kpi-card ${def.groupKey}" data-metric="${key}">
+        <div class="kpi-top">
+          <div class="kpi-icon">${def.icon}</div>
+          <div>
+            <h3 class="kpi-title">${def.label}</h3>
+            <div class="kpi-group">${def.group}</div>
+          </div>
+        </div>
+
+        <div class="kpi-value">${fmt(cur[key])}</div>
+
+        <div class="kpi-rates">
+          ${rateHtml(cur[key], prevMo ? prevMo[key] : null, def.higher, '전월 동기')}
+          ${rateHtml(cur[key], prevYr ? prevYr[key] : null, def.higher, '전년 동기')}
+        </div>
+
+        ${createSparkline(trendValues, def.groupKey)}
+      </article>
+    `;
   }).join('');
 
-  bindKpiCardEvents();
+  document.querySelectorAll('.kpi-card').forEach(card => {
+    card.addEventListener('click', () => openKpiModal(card.dataset.metric));
+  });
 }
 
-// ─── 차트 ───────────────────────────────────────────────────────────────────
-let charts = {};
-let moCharts = {};
-let tnaCharts = {};
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
 
-const CHART_COLORS = {
-  cur: 'rgba(245,166,35,1)',
-  prev: 'rgba(75,124,243,1)',
-  yoy: 'rgba(155,108,243,1)',
-  miss: 'rgba(242,92,110,1)',
-  green: 'rgba(52,196,138,1)',
-};
+  const canvas = $(id);
+  if (!canvas || !window.Chart) return;
 
-function destroyChart(bucket, id) {
-  if (bucket[id]) {
-    bucket[id].destroy();
-    bucket[id] = null;
-  }
+  charts[id] = new Chart(canvas.getContext('2d'), config);
 }
 
-function chartDefaults() {
+function chartBaseOptions() {
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: '#8b91a8', font: { family: 'Pretendard', size: 11 }, boxWidth: 12, padding: 16 } },
-      tooltip: { backgroundColor: '#1e2230', borderColor: '#2a2f42', borderWidth: 1, titleColor: '#e8eaf0', bodyColor: '#8b91a8', padding: 12 },
+      legend: {
+        labels: {
+          color: '#cbd5e1',
+          font: { size: 13, family: 'Pretendard' },
+          boxWidth: 12
+        }
+      },
+      tooltip: {
+        backgroundColor: '#111827',
+        borderColor: 'rgba(255,255,255,.12)',
+        borderWidth: 1,
+        titleColor: '#f8fafc',
+        bodyColor: '#cbd5e1',
+        padding: 12
+      }
     },
     scales: {
-      x: { ticks: { color: '#5a6080', font: { size: 10 } }, grid: { color: 'rgba(42,47,66,.5)' } },
-      y: { ticks: { color: '#5a6080', font: { size: 10 } }, grid: { color: 'rgba(42,47,66,.5)' } },
-    },
+      x: {
+        ticks: { color: '#cbd5e1', font: { size: 12, family: 'Pretendard' } },
+        grid: { color: 'rgba(148, 163, 184, .12)' }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: '#cbd5e1', font: { size: 12, family: 'Pretendard' } },
+        grid: { color: 'rgba(148, 163, 184, .12)' }
+      }
+    }
   };
 }
 
-function makeBarChart(id, labels, datasets) {
-  if (!hasChart() || !$(id)) return;
-  destroyChart(charts, id);
-  charts[id] = new Chart($(id).getContext('2d'), {
-    type: 'bar',
-    data: { labels, datasets },
-    options: { ...chartDefaults(), barPercentage: .65, categoryPercentage: .7 },
-  });
-}
+function renderCharts(cur, prevMo, prevYr, trendKeys, store, team) {
+  const trendMetric = $('trendMetricSelect').value;
+  const compareMetric = $('compareMetricSelect').value;
 
-function renderCharts(cur, prevMo, prevYr) {
-  const labs = ['당월 현재', '전월 동기', '전년 동기'];
+  const trendLabels = trendKeys.map(key => weekMeta[key].short);
+  const trendValues = trendKeys.map(key => sumRows(getRowsByWeekKey(key, store, team))[trendMetric]);
+  const reservationValues = trendKeys.map(key => sumRows(getRowsByWeekKey(key, store, team)).res_req);
 
-  makeBarChart('chart-call', labs, [
-    { label: '연결콜', data: [cur.conn, prevMo?.conn ?? 0, prevYr?.conn ?? 0], backgroundColor: [CHART_COLORS.cur, CHART_COLORS.prev, CHART_COLORS.yoy] },
-    { label: '미연결콜', data: [cur.miss, prevMo?.miss ?? 0, prevYr?.miss ?? 0], backgroundColor: [CHART_COLORS.miss, 'rgba(242,92,110,.5)', 'rgba(242,92,110,.3)'] },
-  ]);
-
-  makeBarChart('chart-views', labs, [
-    { label: '조회수', data: [cur.views, prevMo?.views ?? 0, prevYr?.views ?? 0], backgroundColor: [CHART_COLORS.cur, CHART_COLORS.prev, CHART_COLORS.yoy] },
-  ]);
-
-  makeBarChart('chart-res', labs, [
-    { label: '예약유입', data: [cur.res_in, prevMo?.res_in ?? 0, prevYr?.res_in ?? 0], backgroundColor: [CHART_COLORS.green, 'rgba(52,196,138,.5)', 'rgba(52,196,138,.3)'] },
-    { label: '예약신청', data: [cur.res_req, prevMo?.res_req ?? 0, prevYr?.res_req ?? 0], backgroundColor: ['#00b4d8', 'rgba(0,180,216,.5)', 'rgba(0,180,216,.3)'] },
-  ]);
-
-  makeBarChart('chart-etc', labs, [
-    { label: '리뷰', data: [cur.review, prevMo?.review ?? 0, prevYr?.review ?? 0], backgroundColor: ['#f9c74f', 'rgba(249,199,79,.5)', 'rgba(249,199,79,.3)'] },
-    { label: '톡톡상담', data: [cur.chat, prevMo?.chat ?? 0, prevYr?.chat ?? 0], backgroundColor: [CHART_COLORS.yoy, 'rgba(155,108,243,.5)', 'rgba(155,108,243,.3)'] },
-  ]);
-}
-
-// ─── 주간 보고 렌더 ──────────────────────────────────────────────────────────
-function renderPeriodHeader(yr, mo, wk) {
-  const meta = weekMeta[`${yr}-${mo}-${wk}`];
-  if (!meta) return;
-
-  const pmKey = prevMonthKey(yr, mo, wk);
-  const pyKey = prevYearKey(yr, mo, wk);
-
-  if ($('ph-title')) $('ph-title').innerHTML = `<span>${yr}년 ${mo}월 ${wk}주차</span>`;
-
-  let datesHtml = `<div class="period-date-row current"><span class="label">당 월</span><span>${meta.start} (월) ~ ${meta.end} (일)</span></div>`;
-
-  if (pmKey) {
-    const pm = weekMeta[`${pmKey.yr}-${pmKey.mo}-${pmKey.wk}`];
-    if (pm) datesHtml += `<div class="period-date-row prev"><span class="label">전월동기</span><span>${pm.start} ~ ${pm.end}  (${pm.yr}년 ${pm.mo}월 ${pm.wk}주)</span></div>`;
-  }
-  if (pyKey) {
-    const py = weekMeta[`${pyKey.yr}-${pyKey.mo}-${pyKey.wk}`];
-    if (py) datesHtml += `<div class="period-date-row yoy"><span class="label">전년동기</span><span>${py.start} ~ ${py.end}  (${py.yr}년 ${py.mo}월 ${py.wk}주)</span></div>`;
-  }
-
-  if ($('ph-dates')) $('ph-dates').innerHTML = datesHtml;
-  if ($('period-header')) $('period-header').style.display = 'flex';
-  if ($('period-display')) $('period-display').textContent = `${meta.start} ~ ${meta.end}`;
-}
-
-function renderStoreTable(yr, mo, wk, store, team) {
-  const tbody = $('store-tbody');
-  if (!tbody) return;
-  const rows = getRows(yr, mo, wk, store, team);
-  const totals = sumRows(rows);
-
-  const body = rows.map(r => `<tr>
-    <td>${r.store}</td><td>${r.team}</td>
-    <td>${r.views.toLocaleString()}</td><td>${r.conn.toLocaleString()}</td><td>${r.miss.toLocaleString()}</td>
-    <td>${r.res_in.toLocaleString()}</td><td>${r.res_req.toLocaleString()}</td><td>${r.review.toLocaleString()}</td><td>${r.chat.toLocaleString()}</td>
-  </tr>`).join('');
-
-  tbody.innerHTML = body + `<tr class="tr-total">
-    <td>합계</td><td>—</td>
-    <td>${totals.views.toLocaleString()}</td><td>${totals.conn.toLocaleString()}</td><td>${totals.miss.toLocaleString()}</td>
-    <td>${totals.res_in.toLocaleString()}</td><td>${totals.res_req.toLocaleString()}</td><td>${totals.review.toLocaleString()}</td><td>${totals.chat.toLocaleString()}</td>
-  </tr>`;
-}
-
-function renderDetailTable(yr, mo, wk, store, team) {
-  const tbody = $('detail-tbody');
-  if (!tbody) return;
-
-  const curRows = getRows(yr, mo, wk, store, team);
-  const pmKey = prevMonthKey(yr, mo, wk);
-  const pyKey = prevYearKey(yr, mo, wk);
-  const pmRows = pmKey ? getRows(pmKey.yr, pmKey.mo, pmKey.wk, store, team) : [];
-  const pyRows = pyKey ? getRows(pyKey.yr, pyKey.mo, pyKey.wk, store, team) : [];
-  const storeSet = [...new Set(curRows.map(r => r.store))];
-
-  let html = '';
-  storeSet.forEach(s => {
-    const tr = curRows.find(r => r.store === s);
-    const pm = pmRows.find(r => r.store === s);
-    const py = pyRows.find(r => r.store === s);
-    const teamName = tr?.team || '';
-
-    function row(label, d, current) {
-      if (!d) return '';
-      return `<tr style="opacity:${current ? 1 : .65}">
-        <td${current ? ' style="font-weight:700"' : ''}>${current ? s : ''}</td>
-        <td>${current ? teamName : ''}</td>
-        <td><span class="compare-delta ${current ? 'delta-up' : 'delta-flat'}" style="font-size:10px">${label}</span></td>
-        <td>${d.views.toLocaleString()}</td><td>${d.conn.toLocaleString()}</td><td>${d.miss.toLocaleString()}</td>
-        <td>${d.res_in.toLocaleString()}</td><td>${d.res_req.toLocaleString()}</td><td>${d.review.toLocaleString()}</td><td>${d.chat.toLocaleString()}</td>
-      </tr>`;
-    }
-
-    html += row('당 월', tr, true);
-    html += row('전 월', pm, false);
-    html += row('전 년', py, false);
+  makeChart('chart-trend', {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [{
+        label: METRIC_DEFS[trendMetric].label,
+        data: trendValues,
+        borderColor: '#ff7a00',
+        backgroundColor: 'rgba(255, 122, 0, .18)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#ff7a00'
+      }]
+    },
+    options: chartBaseOptions()
   });
 
-  tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)">데이터가 없습니다</td></tr>';
-}
-
-function applyFilter() {
-  const weekKey = $('sel-week')?.value;
-  const store = $('sel-store')?.value || 'ALL';
-  const team = $('sel-team')?.value || 'ALL';
-  const meta = weekMeta[weekKey];
-
-  if (!meta) {
-    showStatus('조회할 주간 데이터가 없습니다.', true);
-    return;
-  }
-
-  const { yr, mo, wk } = meta;
-  const pmKey = prevMonthKey(yr, mo, wk);
-  const pyKey = prevYearKey(yr, mo, wk);
-
-  const curSum = sumRows(getRows(yr, mo, wk, store, team));
-  const prevMoSum = pmKey ? sumRows(getRows(pmKey.yr, pmKey.mo, pmKey.wk, store, team)) : null;
-  const prevYrSum = pyKey ? sumRows(getRows(pyKey.yr, pyKey.mo, pyKey.wk, store, team)) : null;
-
-  renderPeriodHeader(yr, mo, wk);
-  renderKPI(curSum, prevMoSum, prevYrSum);
-  renderCharts(curSum, prevMoSum, prevYrSum);
-  renderStoreTable(yr, mo, wk, store, team);
-  renderDetailTable(yr, mo, wk, store, team);
-}
-
-async function downloadExcel() {
-  await ensureXlsx();
-  const weekKey = $('sel-week')?.value;
-  const store = $('sel-store')?.value || 'ALL';
-  const team = $('sel-team')?.value || 'ALL';
-  const meta = weekMeta[weekKey];
-  if (!meta) return alert('다운로드할 데이터가 없습니다.');
-
-  const rows = getRows(meta.yr, meta.mo, meta.wk, store, team);
-  const pmKey = prevMonthKey(meta.yr, meta.mo, meta.wk);
-  const pyKey = prevYearKey(meta.yr, meta.mo, meta.wk);
-  const pmRows = pmKey ? getRows(pmKey.yr, pmKey.mo, pmKey.wk, store, team) : [];
-  const pyRows = pyKey ? getRows(pyKey.yr, pyKey.mo, pyKey.wk, store, team) : [];
-
-  const toSheet = (data, label) => data.map(r => ({
-    구분: label, 매장명: r.store, 팀: r.team, 년: r.yr, 월: r.mo, 주차: r.wk,
-    시작일: r.start, 종료일: r.end, 조회수: r.views, 연결콜: r.conn, 미연결콜: r.miss,
-    예약유입: r.res_in, 예약신청: r.res_req, 리뷰: r.review, 톡톡상담: r.chat,
-  }));
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet([...toSheet(rows, '당월'), ...toSheet(pmRows, '전월동기'), ...toSheet(pyRows, '전년동기')]);
-  ws['!cols'] = Array(15).fill({ wch: 12 });
-  XLSX.utils.book_append_sheet(wb, ws, '주간보고서');
-  XLSX.writeFile(wb, `티스테이션_${meta.label}_${meta.start}_${meta.end}.xlsx`);
-}
-
-// ─── 탭 전환 ────────────────────────────────────────────────────────────────
-function switchTab(id, btn) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-  const panel = $('tab-' + id);
-  if (panel) panel.classList.add('active');
-  if (btn) btn.classList.add('active');
-
-  requestAnimationFrame(() => {
-    if (id === 'tna') renderTna();
-    if (id === 'monthly') renderMonthly();
-  });
-}
-
-// ─── 월간 집계 ──────────────────────────────────────────────────────────────
-function getMonthRows(yr, mo, store = 'ALL', team = 'ALL') {
-  return RAW.filter(r =>
-    r.yr === yr && r.mo === mo &&
-    (store === 'ALL' || r.store === store) &&
-    (team === 'ALL' || r.team === team)
-  );
-}
-
-function sumMonthRows(yr, mo, store = 'ALL', team = 'ALL') {
-  return sumRows(getMonthRows(yr, mo, store, team));
-}
-
-function prevMonth(yr, mo) {
-  return mo === 1 ? { yr: yr - 1, mo: 12 } : { yr, mo: mo - 1 };
-}
-
-function prevYear(yr, mo) {
-  return { yr: yr - 1, mo };
-}
-
-function latestUsefulYearMonth() {
-  const yms = [...new Set(RAW.map(r => `${r.yr}-${r.mo}`))]
-    .map(k => {
-      const [yr, mo] = k.split('-').map(Number);
-      return { yr, mo };
-    })
-    .sort((a, b) => (b.yr - a.yr) || (b.mo - a.mo));
-
-  const found = yms.find(x => hasAnyMonthValue(getMonthRows(x.yr, x.mo)));
-  return found || yms[0] || null;
-}
-
-function initMonthlySelects() {
-  const selYr = $('mo-sel-yr');
-  const selMo = $('mo-sel-mo');
-  if (!selYr || !selMo) return;
-
-  const ymSet = {};
-  RAW.forEach(r => {
-    if (!r.yr || !r.mo) return;
-    if (!ymSet[r.yr]) ymSet[r.yr] = new Set();
-    ymSet[r.yr].add(r.mo);
-  });
-
-  const years = Object.keys(ymSet).map(Number).sort((a, b) => b - a);
-  const latest = latestUsefulYearMonth();
-
-  setOptions(selYr, years.map(yr => ({ value: String(yr), label: `${yr}년` })), latest ? String(latest.yr) : String(years[0] || ''));
-
-  function updateMonths(keepValue = false) {
-    const yr = Number(selYr.value);
-    const months = ymSet[yr] ? [...ymSet[yr]].sort((a, b) => a - b) : [];
-    const prev = keepValue ? selMo.value : '';
-    setOptions(selMo, months.map(m => ({ value: String(m), label: `${m}월` })), prev);
-
-    if (!selMo.value && months.length) {
-      const target = latest && latest.yr === yr ? latest.mo : months[months.length - 1];
-      selMo.value = String(target);
-    }
-  }
-
-  selYr.onchange = () => updateMonths(false);
-  updateMonths(false);
-
-  setOptions($('mo-sel-store'), [{ value: 'ALL', label: '전체 매장' }, ...STORES.map(s => ({ value: s, label: s }))], $('mo-sel-store')?.value || 'ALL');
-  setOptions($('mo-sel-team'), [{ value: 'ALL', label: '전체 팀' }, ...TEAMS.map(t => ({ value: t, label: t }))], $('mo-sel-team')?.value || 'ALL');
-}
-
-function monthPeriodLabel(y, m) {
-  const rows = getMonthRows(y, m);
-  if (!rows.length) return null;
-  const starts = rows.map(r => r.start).filter(Boolean).sort();
-  const ends = rows.map(r => r.end).filter(Boolean).sort();
-  return starts[0] && ends[ends.length - 1] ? `${starts[0]} ~ ${ends[ends.length - 1]}` : `${y}년 ${m}월`;
-}
-
-function makeMonthChart(id, labels, datasets) {
-  if (!hasChart() || !$(id)) return;
-  destroyChart(moCharts, id);
-  moCharts[id] = new Chart($(id).getContext('2d'), {
-    type: 'bar',
-    data: { labels, datasets },
+  makeChart('chart-groups', {
+    type: 'doughnut',
+    data: {
+      labels: ['노출 관련 지표', '전환 관련 지표', '관리 관련 지표'],
+      datasets: [{
+        data: [2, 2, 3],
+        backgroundColor: ['#ff7a00', '#38a7ff', '#35d07f'],
+        borderWidth: 0
+      }]
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      barPercentage: .6,
-      categoryPercentage: .65,
+      cutout: '58%',
       plugins: {
-        legend: { labels: { color: '#8b91a8', font: { family: 'Pretendard', size: 11 }, boxWidth: 12, padding: 14 } },
-        tooltip: { backgroundColor: '#1e2230', borderColor: '#2a2f42', borderWidth: 1, titleColor: '#e8eaf0', bodyColor: '#8b91a8', padding: 10 },
-      },
-      scales: {
-        x: { ticks: { color: '#5a6080', font: { size: 11 } }, grid: { color: 'rgba(42,47,66,.4)' } },
-        y: { ticks: { color: '#5a6080', font: { size: 10 } }, grid: { color: 'rgba(42,47,66,.4)' } },
-      },
-    },
-  });
-}
-
-function deltaHtml(cur, ref, higher) {
-  const r = calcRate(cur, ref, higher);
-  if (!r) return '<div style="margin-top:5px"><span style="font-size:11px;color:var(--text3)">—</span></div>';
-  const cls = r.good ? 'delta-up' : 'delta-dn';
-  const arrow = r.d > 0 ? '▲' : r.d < 0 ? '▼' : '';
-  return `<div style="margin-top:5px"><span class="compare-delta ${cls}">${arrow} ${Math.abs(r.d).toFixed(1)}%</span></div>`;
-}
-
-function renderMonthly() {
-  const selYr = $('mo-sel-yr');
-  const selMo = $('mo-sel-mo');
-  if (!selYr || !selMo || !selYr.value || !selMo.value) return;
-
-  const yr = Number(selYr.value);
-  const mo = Number(selMo.value);
-  const store = $('mo-sel-store')?.value || 'ALL';
-  const team = $('mo-sel-team')?.value || 'ALL';
-  const pm = prevMonth(yr, mo);
-  const py = prevYear(yr, mo);
-
-  const curSum = sumMonthRows(yr, mo, store, team);
-  const prevMoSum = sumMonthRows(pm.yr, pm.mo, store, team);
-  const prevYrSum = sumMonthRows(py.yr, py.mo, store, team);
-
-  const badgeData = [
-    { label: '당 월', y: yr, m: mo, cls: 'rgba(245,166,35,.15)', tc: 'var(--accent)' },
-    { label: '전 월', y: pm.yr, m: pm.mo, cls: 'rgba(75,124,243,.1)', tc: 'var(--blue)' },
-    { label: '전 년', y: py.yr, m: py.mo, cls: 'rgba(155,108,243,.1)', tc: 'var(--purple)' },
-  ];
-
-  if ($('mo-period-badges')) {
-    $('mo-period-badges').innerHTML = badgeData.map(b => {
-      const lbl = monthPeriodLabel(b.y, b.m);
-      if (!lbl) return '';
-      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:${b.cls};border:1px solid ${b.tc}33;font-size:11px">
-        <span style="font-weight:700;color:${b.tc}">${b.label}</span><span style="color:var(--text2)">${b.y}년 ${b.m}월 · ${lbl}</span>
-      </div>`;
-    }).join('');
-  }
-
-  if ($('mo-table-title')) $('mo-table-title').textContent = `${yr}년 ${mo}월 / ${pm.yr}년 ${pm.mo}월 / ${py.yr}년 ${py.mo}월 비교`;
-
-  const section = $('mo-kpi-section');
-  if (section) {
-    section.innerHTML = KPI_GROUPS.map(grp => {
-      const defs = KPI_DEFS.filter(d => d.group === grp.id);
-      return `<div style="margin-bottom:24px">
-        <div class="kpi-group-header"><span class="kpi-group-badge ${grp.id}">${grp.icon} ${grp.label}</span><span style="font-size:11px;color:var(--text3)">${grp.desc}</span><div class="kpi-group-divider"></div></div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px">
-          ${defs.map(def => {
-            const cv = curSum[def.key] || 0;
-            const pv = prevMoSum[def.key] || 0;
-            const yv = prevYrSum[def.key] || 0;
-            return `<div class="kpi-card ${def.cls}" style="padding:18px">
-              <div class="kpi-label" style="margin-bottom:14px">${def.label}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-                <div style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--accent);letter-spacing:.05em;margin-bottom:6px">당 월</div><div style="font-size:22px;font-weight:800;color:var(--text);line-height:1">${cv.toLocaleString()}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${yr}년 ${mo}월</div></div>
-                <div style="background:rgba(75,124,243,.08);border:1px solid rgba(75,124,243,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--blue);letter-spacing:.05em;margin-bottom:4px">전 월</div><div style="font-size:18px;font-weight:700;color:var(--text2);line-height:1">${pv.toLocaleString()}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${pm.yr}년 ${pm.mo}월</div>${deltaHtml(cv, pv, def.higher)}</div>
-                <div style="background:rgba(155,108,243,.08);border:1px solid rgba(155,108,243,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--purple);letter-spacing:.05em;margin-bottom:4px">전 년</div><div style="font-size:18px;font-weight:700;color:var(--text2);line-height:1">${yv.toLocaleString()}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${py.yr}년 ${py.mo}월</div>${deltaHtml(cv, yv, def.higher)}</div>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  const labs = [`${yr}년 ${mo}월`, `${pm.yr}년 ${pm.mo}월`, `${py.yr}년 ${py.mo}월`];
-  const C = ['rgba(245,166,35,.85)', 'rgba(75,124,243,.75)', 'rgba(155,108,243,.75)'];
-  makeMonthChart('mo-chart-call', [
-    { label: '연결콜', data: [curSum.conn, prevMoSum.conn, prevYrSum.conn], backgroundColor: C },
-    { label: '미연결콜', data: [curSum.miss, prevMoSum.miss, prevYrSum.miss], backgroundColor: ['rgba(242,92,110,.8)', 'rgba(242,92,110,.55)', 'rgba(242,92,110,.4)'] },
-  ]);
-  makeMonthChart('mo-chart-views', [{ label: '조회수', data: [curSum.views, prevMoSum.views, prevYrSum.views], backgroundColor: C }]);
-  makeMonthChart('mo-chart-res', [
-    { label: '예약유입', data: [curSum.res_in, prevMoSum.res_in, prevYrSum.res_in], backgroundColor: ['rgba(52,196,138,.85)', 'rgba(52,196,138,.6)', 'rgba(52,196,138,.4)'] },
-    { label: '예약신청', data: [curSum.res_req, prevMoSum.res_req, prevYrSum.res_req], backgroundColor: ['rgba(0,180,216,.85)', 'rgba(0,180,216,.6)', 'rgba(0,180,216,.4)'] },
-  ]);
-  makeMonthChart('mo-chart-etc', [
-    { label: '리뷰', data: [curSum.review, prevMoSum.review, prevYrSum.review], backgroundColor: ['rgba(249,199,79,.85)', 'rgba(249,199,79,.6)', 'rgba(249,199,79,.4)'] },
-    { label: '톡톡상담', data: [curSum.chat, prevMoSum.chat, prevYrSum.chat], backgroundColor: ['rgba(155,108,243,.85)', 'rgba(155,108,243,.6)', 'rgba(155,108,243,.4)'] },
-  ]);
-
-  renderMonthlyTable(yr, mo, pm, py, store, team);
-}
-
-function renderMonthlyTable(yr, mo, pm, py, store, team) {
-  const thead = $('mo-table-head');
-  const tbody = $('mo-table-body');
-  if (!thead || !tbody) return;
-
-  const metricLabels = ['조회수', '연결콜', '미연결콜', '예약유입', '예약신청', '리뷰', '톡톡상담'];
-  const metricKeys = ['views', 'conn', 'miss', 'res_in', 'res_req', 'review', 'chat'];
-
-  thead.innerHTML = '<th style="text-align:left;padding:10px 14px;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap">매장명</th>'
-    + '<th style="text-align:left;padding:10px 8px;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border)">팀</th>'
-    + '<th style="padding:10px 8px;text-align:center;background:var(--surface2);color:var(--text3);font-size:10px;border-bottom:1px solid var(--border)">구분</th>'
-    + metricLabels.map(h => `<th style="padding:10px 8px;text-align:right;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap">${h}</th>`).join('');
-
-  const periodSets = [
-    { label: '당 월', y: yr, m: mo, tc: 'var(--accent)', bg: 'rgba(245,166,35,.06)' },
-    { label: '전 월', y: pm.yr, m: pm.mo, tc: 'var(--blue)', bg: 'rgba(75,124,243,.04)' },
-    { label: '전 년', y: py.yr, m: py.mo, tc: 'var(--purple)', bg: 'rgba(155,108,243,.04)' },
-  ];
-
-  const allStores = store === 'ALL' ? STORES : STORES.filter(s => s === store);
-  let tableHtml = '';
-
-  allStores.forEach(s => {
-    const storeTeam = (RAW.find(r => r.store === s) || {}).team || '';
-    if (team !== 'ALL' && storeTeam !== team) return;
-
-    periodSets.forEach((ps, pi) => {
-      const d = sumRows(getMonthRows(ps.y, ps.m, s, 'ALL'));
-      const borderAlpha = pi === 2 ? '.5' : '.2';
-      tableHtml += `<tr style="background:${ps.bg}">`;
-      if (pi === 0) {
-        tableHtml += `<td style="padding:8px 14px;font-weight:700;color:var(--text);font-size:12px;border-bottom:1px solid rgba(42,47,66,.3);white-space:nowrap;vertical-align:middle" rowspan="3">${s}</td>`;
-        tableHtml += `<td style="padding:8px 8px;font-size:10px;color:var(--text3);border-bottom:1px solid rgba(42,47,66,.3);vertical-align:middle" rowspan="3">${storeTeam}</td>`;
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827',
+          titleColor: '#f8fafc',
+          bodyColor: '#cbd5e1',
+          padding: 12
+        }
       }
-      tableHtml += `<td style="padding:7px 8px;text-align:center;border-bottom:1px solid rgba(42,47,66,${borderAlpha})"><span style="font-size:10px;font-weight:700;color:${ps.tc};background:${ps.bg};border:1px solid ${ps.tc}33;padding:2px 8px;border-radius:10px">${ps.label}</span></td>`;
-      metricKeys.forEach(k => {
-        const v = d[k] || 0;
-        tableHtml += `<td style="padding:7px 8px;text-align:right;border-bottom:1px solid rgba(42,47,66,${borderAlpha});color:${v > 0 ? (pi === 0 ? 'var(--text)' : 'var(--text2)') : 'var(--text3)'};font-size:12px;font-weight:${pi === 0 && v > 0 ? 600 : 400}">${v > 0 ? v.toLocaleString() : '—'}</td>`;
-      });
-      tableHtml += '</tr>';
-    });
+    }
   });
 
-  periodSets.forEach((ps, pi) => {
-    const d = sumMonthRows(ps.y, ps.m, store, team);
-    const bt = pi === 0 ? '2px' : '1px';
-    tableHtml += '<tr style="background:var(--surface2)">';
-    if (pi === 0) {
-      tableHtml += '<td style="padding:10px 14px;font-weight:800;color:var(--text);font-size:12px;border-top:2px solid var(--border)" rowspan="3">합 계</td>';
-      tableHtml += '<td style="font-size:10px;color:var(--text3);padding:10px 8px;border-top:2px solid var(--border)" rowspan="3">—</td>';
-    }
-    tableHtml += `<td style="padding:8px;text-align:center;border-top:${bt} solid var(--border)"><span style="font-size:10px;font-weight:700;color:${ps.tc};padding:2px 8px;border-radius:10px;background:${ps.bg};border:1px solid ${ps.tc}33">${ps.label}</span></td>`;
-    metricKeys.forEach(k => {
-      tableHtml += `<td style="padding:8px;text-align:right;border-top:${bt} solid var(--border);font-weight:${pi === 0 ? 800 : 600};color:${pi === 0 ? 'var(--accent)' : 'var(--text2)'};font-size:12px">${d[k].toLocaleString()}</td>`;
-    });
-    tableHtml += '</tr>';
+  makeChart('chart-reservation', {
+    type: 'bar',
+    data: {
+      labels: trendLabels,
+      datasets: [{
+        label: '예약신청',
+        data: reservationValues,
+        backgroundColor: '#ff7a00',
+        borderRadius: 8
+      }]
+    },
+    options: chartBaseOptions()
   });
 
-  tbody.innerHTML = tableHtml || '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text3)">월간 데이터가 없습니다</td></tr>';
-}
-
-async function downloadMonthlyExcel() {
-  await ensureXlsx();
-  const yr = Number($('mo-sel-yr')?.value);
-  const mo = Number($('mo-sel-mo')?.value);
-  const store = $('mo-sel-store')?.value || 'ALL';
-  const team = $('mo-sel-team')?.value || 'ALL';
-  if (!yr || !mo) return alert('다운로드할 월간 데이터가 없습니다.');
-
-  const pm = prevMonth(yr, mo);
-  const py = prevYear(yr, mo);
-  const periods = [{ label: '당월', y: yr, m: mo }, { label: '전월', y: pm.yr, m: pm.mo }, { label: '전년', y: py.yr, m: py.mo }];
-  const allData = [];
-
-  periods.forEach(ps => {
-    getMonthRows(ps.y, ps.m, store, team).forEach(r => allData.push({
-      구분: ps.label, 연도: ps.y, 월: ps.m, 주차: r.wk, 기간: `${r.start}~${r.end}`, 매장명: r.store, 팀: r.team,
-      조회수: r.views, 연결콜: r.conn, 미연결콜: r.miss, 예약유입: r.res_in, 예약신청: r.res_req, 리뷰: r.review, 톡톡상담: r.chat,
-    }));
-  });
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(allData);
-  ws['!cols'] = Array(14).fill({ wch: 12 });
-  XLSX.utils.book_append_sheet(wb, ws, '월간집계');
-  XLSX.writeFile(wb, `티스테이션_월간집계_${yr}년${mo}월.xlsx`);
-}
-
-// ─── 타이어앤 데이터 ────────────────────────────────────────────────────────
-function normalizeTireRow(r) {
-  return {
-    yr: num(r.yr ?? r['년'] ?? r.year),
-    mo: num(r.mo ?? r['월'] ?? r.month),
-    store: text(r.store ?? r['매장명'] ?? r.store_name),
-    qty: num(r.qty ?? r['판매개수'] ?? r['판매갯수'] ?? r['판매수량'] ?? r.quantity),
-    amt: num(r.amt ?? r.amount ?? r['판매금액'] ?? r['판매 금액']),
-  };
-}
-
-function buildTnaFromRows(rows) {
-  const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
-  const byStore = {};
-  const monthly = {};
-  MONTHS.forEach(m => { monthly[m] = { qty: 0, amt: 0 }; });
-
-  rows.map(normalizeTireRow).forEach(r => {
-    if (!r.yr || !r.mo || !r.store) return;
-    if (!byStore[r.store]) {
-      byStore[r.store] = { store: r.store, monthly: {}, total_qty: 0, total_amt: 0 };
-      MONTHS.forEach(m => { byStore[r.store].monthly[m] = { qty: 0, amt: 0 }; });
-    }
-
-    byStore[r.store].monthly[r.mo].qty += r.qty;
-    byStore[r.store].monthly[r.mo].amt += r.amt;
-    byStore[r.store].total_qty += r.qty;
-    byStore[r.store].total_amt += r.amt;
-    monthly[r.mo].qty += r.qty;
-    monthly[r.mo].amt += r.amt;
-  });
-
-  return { stores: Object.values(byStore).sort((a, b) => a.store.localeCompare(b.store, 'ko')), monthly };
-}
-
-function updateTnaYearSelectFromRows(rows) {
-  const selYear = $('tna-sel-year');
-  if (!selYear) return;
-
-  const years = [...new Set(rows.map(r => num(r.yr ?? r['년'] ?? r.year)).filter(Boolean))].sort((a, b) => b - a);
-  if (!years.length) return;
-
-  const prev = selYear.value;
-  setOptions(selYear, years.map(y => ({ value: String(y), label: `${y}년` })), prev);
-  if (!selYear.value) selYear.value = String(years[0]);
-
-  if (!selYear.dataset.bound) {
-    selYear.dataset.bound = '1';
-    selYear.addEventListener('change', () => {
-      rebuildTnaFromLiveRows();
-      renderTna();
-    });
-  }
-}
-
-function getTnaSelectedYear() {
-  return Number($('tna-sel-year')?.value || new Date().getFullYear());
-}
-
-function rebuildTnaFromLiveRows() {
-  const selectedYear = getTnaSelectedYear();
-  const filteredRows = Array.isArray(TNA_LIVE_ROWS)
-    ? TNA_LIVE_ROWS.filter(r => num(r.yr ?? r['년'] ?? r.year) === selectedYear)
-    : [];
-
-  TNA = filteredRows.length ? buildTnaFromRows(filteredRows) : makeEmptyTna();
-  initTnaSelects();
-}
-
-async function loadTnaFromGoogleSheets(forceFresh = false) {
-  if (!TIRE_DATA_URL) return false;
-
-  try {
-    const payload = await fetchJsonWithCache(TIRE_DATA_URL, 'tna_tire_rows_v3', 5 * 60 * 1000, forceFresh);
-    const rows = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : null);
-
-    if (rows) {
-      TNA_LIVE_ROWS = rows.map(normalizeTireRow).filter(r => r.yr && r.mo && r.store);
-      updateTnaYearSelectFromRows(TNA_LIVE_ROWS);
-      rebuildTnaFromLiveRows();
-      return true;
-    }
-
-    if (payload && Array.isArray(payload.stores) && payload.monthly) {
-      TNA = payload;
-      return true;
-    }
-
-    throw new Error(payload?.error || '타이어앤 데이터 형식 오류');
-  } catch (e) {
-    console.warn('타이어앤 구글 시트 연동 실패:', e);
-    TNA = makeEmptyTna();
-    return false;
-  }
-}
-
-function initTnaSelects() {
-  const sel = $('tna-sel-store');
-  if (!sel) return;
-  const prev = sel.value || 'ALL';
-  setOptions(sel, [{ value: 'ALL', label: '전체 매장' }, ...TNA.stores.map(d => ({ value: d.store, label: d.store }))], prev);
-  if (!sel.value) sel.value = 'ALL';
-}
-
-function getTnaStores() {
-  const sel = $('tna-sel-store')?.value || 'ALL';
-  return sel === 'ALL' ? TNA.stores : TNA.stores.filter(d => d.store === sel);
-}
-
-async function refreshTnaAndRender() {
-  const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().includes('최신 조회'));
-  const originalText = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '불러오는 중...'; }
-
-  await loadTnaFromGoogleSheets(true);
-  renderTna();
-
-  if (btn) { btn.disabled = false; btn.innerHTML = originalText || '최신 조회'; }
-}
-
-function renderTna() {
-  const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
-  const stores = getTnaStores();
-  const selectedYear = getTnaSelectedYear();
-
-  if ($('tna-table-title')) $('tna-table-title').textContent = `${selectedYear}년 타이어앤 판매 현황`;
-
-  const totalQty = stores.reduce((s, d) => s + num(d.total_qty), 0);
-  const totalAmt = stores.reduce((s, d) => s + num(d.total_amt), 0);
-  const activeMonths = MONTHS.filter(m => stores.some(d => num(d.monthly?.[m]?.qty) > 0));
-  const avgMonthQty = activeMonths.length ? Math.round(totalQty / activeMonths.length) : 0;
-  const activeStores = stores.filter(d => num(d.total_qty) > 0);
-  const avgStoreQty = activeStores.length ? Math.round(totalQty / activeStores.length) : 0;
-  const topStore = [...stores].sort((a, b) => num(b.total_qty) - num(a.total_qty))[0];
-  const minQty = stores.length ? Math.min(...stores.map(d => num(d.total_qty))) : 0;
-  const bottomStores = stores.filter(d => num(d.total_qty) === minQty);
-  const bottomStore = bottomStores[0];
-
-  if ($('tna-kpi-grid')) {
-    const cards = [
-      { label: '총 판매 수량', val: `${totalQty.toLocaleString()}개`, sub: `${selectedYear}년 누적`, cls: 'conn' },
-      { label: '총 판매 금액', val: `${Math.round(totalAmt / 10000).toLocaleString()}만원`, sub: `${selectedYear}년 누적`, cls: 'views' },
-      { label: '월 평균 판매', val: `${avgMonthQty.toLocaleString()}개`, sub: `판매 발생 월 기준 · ${activeMonths.length}개월`, cls: 'resin' },
-      { label: '매장당 평균', val: `${avgStoreQty.toLocaleString()}개`, sub: `판매 발생 매장 기준 · ${activeStores.length}개점`, cls: 'resreq' },
-      { label: '최다 판매 매장', val: topStore?.store || '—', sub: `${num(topStore?.total_qty).toLocaleString()}개`, cls: 'review' },
-      { label: '최하 판매 매장', val: bottomStore?.store || '—', sub: `${minQty.toLocaleString()}개${bottomStores.length > 1 ? ' · 외 ' + (bottomStores.length - 1) + '개점' : ''}`, cls: 'miss' },
-    ];
-
-    $('tna-kpi-grid').innerHTML = cards.map(c => `<div class="kpi-card ${c.cls}">
-      <div class="kpi-label">${c.label}</div><div class="kpi-value" style="font-size:24px;margin-bottom:6px">${c.val}</div><div style="font-size:11px;color:var(--text3)">${c.sub}</div>
-    </div>`).join('');
-  }
-
-  const moQty = MONTHS.map(m => stores.reduce((s, d) => s + num(d.monthly?.[m]?.qty), 0));
-  const moAmt = MONTHS.map(m => Math.round(stores.reduce((s, d) => s + num(d.monthly?.[m]?.amt), 0) / 10000));
-
-  renderTnaCharts(MONTHS, moQty, moAmt, stores);
-  renderTnaHeatmap(MONTHS, stores);
-  renderTnaTable(MONTHS, stores);
-}
-
-function renderTnaCharts(MONTHS, moQty, moAmt, stores) {
-  if (!hasChart()) return;
-  const labels = MONTHS.map(m => `${m}월`);
-
-  if ($('tna-chart-monthly')) {
-    destroyChart(tnaCharts, 'monthly');
-    tnaCharts.monthly = new Chart($('tna-chart-monthly').getContext('2d'), {
-      data: {
-        labels,
-        datasets: [
-          { type: 'bar', label: '판매금액(만원)', data: moAmt, backgroundColor: 'rgba(75,124,243,.7)', borderRadius: 4, yAxisID: 'y1' },
-          { type: 'line', label: '판매갯수(개)', data: moQty, borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,.15)', pointBackgroundColor: '#f5a623', pointRadius: 5, tension: .3, yAxisID: 'y2' },
+  makeChart('chart-compare', {
+    type: 'bar',
+    data: {
+      labels: ['당월 / 당주', '전월 동기', '전년 동기'],
+      datasets: [{
+        label: METRIC_DEFS[compareMetric].label,
+        data: [
+          cur[compareMetric] || 0,
+          prevMo ? prevMo[compareMetric] || 0 : 0,
+          prevYr ? prevYr[compareMetric] || 0 : 0
         ],
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: chartDefaults().plugins, scales: { x: chartDefaults().scales.x, y1: { type: 'linear', position: 'left', ticks: { color: '#4b7cf3', font: { size: 10 } }, grid: { color: 'rgba(42,47,66,.4)' } }, y2: { type: 'linear', position: 'right', ticks: { color: '#f5a623', font: { size: 10 } }, grid: { drawOnChartArea: false } } } },
-    });
-  }
-
-  const sortedQty = [...stores].filter(d => num(d.total_qty) > 0).sort((a, b) => num(b.total_qty) - num(a.total_qty));
-  const sortedAmt = [...stores].filter(d => num(d.total_amt) > 0).sort((a, b) => num(b.total_amt) - num(a.total_amt));
-
-  if ($('tna-chart-qty-rank')) {
-    destroyChart(tnaCharts, 'qtyRank');
-    tnaCharts.qtyRank = new Chart($('tna-chart-qty-rank').getContext('2d'), {
-      type: 'bar', data: { labels: sortedQty.map(d => d.store), datasets: [{ label: '판매갯수(개)', data: sortedQty.map(d => d.total_qty), backgroundColor: 'rgba(75,124,243,.8)', borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: chartDefaults().plugins.tooltip }, scales: { x: chartDefaults().scales.x, y: { ticks: { color: '#8b91a8', font: { size: 11 } }, grid: { display: false } } } },
-    });
-  }
-
-  if ($('tna-chart-amt-rank')) {
-    destroyChart(tnaCharts, 'amtRank');
-    tnaCharts.amtRank = new Chart($('tna-chart-amt-rank').getContext('2d'), {
-      type: 'bar', data: { labels: sortedAmt.map(d => d.store), datasets: [{ label: '판매금액(만원)', data: sortedAmt.map(d => Math.round(num(d.total_amt) / 10000)), backgroundColor: 'rgba(245,166,35,.8)', borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: chartDefaults().plugins.tooltip }, scales: { x: chartDefaults().scales.x, y: { ticks: { color: '#8b91a8', font: { size: 11 } }, grid: { display: false } } } },
-    });
-  }
-}
-
-function renderTnaHeatmap(MONTHS, stores) {
-  const wrap = $('tna-heatmap');
-  if (!wrap) return;
-  const maxVal = Math.max(0, ...stores.flatMap(d => MONTHS.map(m => num(d.monthly?.[m]?.qty))));
-  const rows = stores.filter(d => num(d.total_qty) > 0).map(d => {
-    const cells = MONTHS.map(m => {
-      const v = num(d.monthly?.[m]?.qty);
-      const intensity = maxVal > 0 ? v / maxVal : 0;
-      const alpha = 0.08 + intensity * 0.87;
-      const bg = v > 0 ? `rgba(75,124,243,${alpha.toFixed(2)})` : 'transparent';
-      const txtColor = intensity > 0.5 ? '#fff' : intensity > 0.15 ? '#c8d4ff' : 'var(--text3)';
-      return `<td style="text-align:center;font-size:12px;font-weight:${v > 0 ? 600 : 400};background:${bg};color:${txtColor};padding:8px 6px;border-bottom:1px solid rgba(42,47,66,.3);white-space:nowrap">${v > 0 ? v : ''}</td>`;
-    }).join('');
-    return `<tr><td style="padding:8px 16px;font-weight:600;color:var(--text);font-size:12px;white-space:nowrap;border-bottom:1px solid rgba(42,47,66,.3)">${d.store}</td>${cells}</tr>`;
-  }).join('');
-
-  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>
-    <th style="padding:10px 16px;text-align:left;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border)">매장명</th>
-    ${MONTHS.map(m => `<th style="padding:10px 8px;text-align:center;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap">${m}월</th>`).join('')}
-  </tr></thead><tbody>${rows || '<tr><td colspan="13" style="padding:30px;text-align:center;color:var(--text3)">판매 데이터가 없습니다</td></tr>'}</tbody></table>`;
-}
-
-function renderTnaTable(MONTHS, stores) {
-  const thead = $('tna-table-head');
-  const tbody = $('tna-table-body');
-  if (!thead || !tbody) return;
-
-  thead.innerHTML = `<th style="text-align:left;padding:10px 14px;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border)">매장명</th>`
-    + MONTHS.flatMap(m => [
-      `<th style="padding:10px 8px;text-align:right;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap">${m}월 개수</th>`,
-      `<th style="padding:10px 8px;text-align:right;background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap">${m}월 금액(원)</th>`,
-    ]).join('')
-    + '<th style="padding:10px 8px;text-align:right;background:rgba(245,166,35,.1);color:var(--accent);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border)">합계개수</th>'
-    + '<th style="padding:10px 8px;text-align:right;background:rgba(245,166,35,.1);color:var(--accent);font-size:10px;letter-spacing:.05em;border-bottom:1px solid var(--border)">합계금액(원)</th>';
-
-  let totQty = 0;
-  let totAmt = 0;
-  const moTotQty = {};
-  const moTotAmt = {};
-  MONTHS.forEach(m => { moTotQty[m] = 0; moTotAmt[m] = 0; });
-
-  const rows = stores.map(d => {
-    totQty += num(d.total_qty);
-    totAmt += num(d.total_amt);
-    const cells = MONTHS.flatMap(m => {
-      const qty = num(d.monthly?.[m]?.qty);
-      const amt = num(d.monthly?.[m]?.amt);
-      moTotQty[m] += qty;
-      moTotAmt[m] += amt;
-      return [
-        `<td style="padding:9px 8px;text-align:right;border-bottom:1px solid rgba(42,47,66,.4);color:${qty > 0 ? 'var(--text)' : 'var(--text3)'};font-size:12px">${qty > 0 ? qty.toLocaleString() : '-'}</td>`,
-        `<td style="padding:9px 8px;text-align:right;border-bottom:1px solid rgba(42,47,66,.4);color:${amt > 0 ? 'var(--text2)' : 'var(--text3)'};font-size:12px">${amt > 0 ? formatMoneyWon(amt) : '-'}</td>`,
-      ];
-    }).join('');
-
-    return `<tr><td style="padding:9px 14px;font-weight:600;color:var(--text);font-size:12px;border-bottom:1px solid rgba(42,47,66,.4);white-space:nowrap">${d.store}</td>${cells}
-      <td style="padding:9px 8px;text-align:right;border-bottom:1px solid rgba(42,47,66,.4);color:var(--accent);font-weight:700;font-size:12px">${num(d.total_qty) > 0 ? num(d.total_qty).toLocaleString() : '-'}</td>
-      <td style="padding:9px 8px;text-align:right;border-bottom:1px solid rgba(42,47,66,.4);color:var(--accent);font-weight:700;font-size:12px">${num(d.total_amt) > 0 ? formatMoneyWon(d.total_amt) : '-'}</td></tr>`;
-  }).join('');
-
-  const totalCells = MONTHS.flatMap(m => [
-    `<td style="padding:9px 8px;text-align:right;background:var(--surface2);font-weight:700;color:var(--text);font-size:12px">${moTotQty[m] > 0 ? moTotQty[m].toLocaleString() : '-'}</td>`,
-    `<td style="padding:9px 8px;text-align:right;background:var(--surface2);font-weight:700;color:var(--text);font-size:12px">${moTotAmt[m] > 0 ? formatMoneyWon(moTotAmt[m]) : '-'}</td>`,
-  ]).join('');
-
-  tbody.innerHTML = (rows || `<tr><td colspan="27" style="padding:40px;text-align:center;color:var(--text3)">판매 데이터가 없습니다</td></tr>`)
-    + `<tr class="tr-total"><td style="padding:9px 14px;font-weight:700;color:var(--text);font-size:12px;background:var(--surface2)">합계</td>${totalCells}<td style="padding:9px 8px;text-align:right;background:rgba(245,166,35,.15);font-weight:800;color:var(--accent);font-size:13px">${totQty.toLocaleString()}</td><td style="padding:9px 8px;text-align:right;background:rgba(245,166,35,.15);font-weight:800;color:var(--accent);font-size:13px">${formatMoneyWon(totAmt)}</td></tr>`;
-}
-
-async function downloadTnaExcel() {
-  await ensureXlsx();
-  const stores = getTnaStores();
-  const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
-  const rows = stores.map(d => {
-    const row = { 매장명: d.store };
-    MONTHS.forEach(m => {
-      row[`${m}월_개수`] = num(d.monthly?.[m]?.qty);
-      row[`${m}월_금액`] = num(d.monthly?.[m]?.amt);
-    });
-    row['합계_개수'] = num(d.total_qty);
-    row['합계_금액'] = num(d.total_amt);
-    return row;
+        backgroundColor: ['#ff7a00', '#38a7ff', '#8b5cf6'],
+        borderRadius: 8
+      }]
+    },
+    options: chartBaseOptions()
   });
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb, ws, '타이어앤_판매집계');
-  XLSX.writeFile(wb, `티스테이션_타이어앤_판매현황_${getTnaSelectedYear()}년.xlsx`);
 }
 
-// ─── KPI 상세 모달 ──────────────────────────────────────────────────────────
-function openKpiModal(data) {
-  if (!$('kpiModal')) return;
-  if ($('kpiModalTitle')) $('kpiModalTitle').textContent = data.title || '-';
-  if ($('kpiModalValue')) $('kpiModalValue').textContent = data.current || '-';
-  if ($('kpiModalPrevMonth')) $('kpiModalPrevMonth').textContent = data.prevMonth || '-';
-  if ($('kpiModalPrevYear')) $('kpiModalPrevYear').textContent = data.prevYear || '-';
-  if ($('kpiModalDeltaMonth')) $('kpiModalDeltaMonth').textContent = data.deltaMonth || '-';
-  if ($('kpiModalDeltaYear')) $('kpiModalDeltaYear').textContent = data.deltaYear || '-';
-  $('kpiModal').style.display = 'block';
+function renderDetailTable(rows) {
+  const tbody = $('detail-tbody');
+  const total = sumRows(rows);
+
+  const html = rows.map(r => `
+    <tr>
+      <td>${r.store}</td>
+      <td>${r.team}</td>
+      <td>${fmt(r.views)}</td>
+      <td>${fmt(r.conn)}</td>
+      <td>${fmt(r.miss)}</td>
+      <td>${fmt(r.res_in)}</td>
+      <td>${fmt(r.res_req)}</td>
+      <td>${fmt(r.review)}</td>
+      <td>${fmt(r.chat)}</td>
+    </tr>
+  `).join('');
+
+  tbody.innerHTML = html + `
+    <tr class="total-row">
+      <td>합계</td>
+      <td>-</td>
+      <td>${fmt(total.views)}</td>
+      <td>${fmt(total.conn)}</td>
+      <td>${fmt(total.miss)}</td>
+      <td>${fmt(total.res_in)}</td>
+      <td>${fmt(total.res_req)}</td>
+      <td>${fmt(total.review)}</td>
+      <td>${fmt(total.chat)}</td>
+    </tr>
+  `;
+}
+
+function renderInsight(cur, prevMo) {
+  if (!prevMo || !hasAnyData(prevMo)) {
+    $('weekly-insight').textContent = '비교 가능한 전월 동기 데이터가 없어 이번 주 성과만 표시하고 있습니다.';
+    return;
+  }
+
+  const viewsRate = deltaRate(cur.views, prevMo.views, true);
+  const callRate = deltaRate(cur.conn, prevMo.conn, true);
+  const reserveRate = deltaRate(cur.res_req, prevMo.res_req, true);
+  const missRate = deltaRate(cur.miss, prevMo.miss, false);
+
+  const messages = [];
+
+  if (viewsRate) {
+    messages.push(`플레이스 조회수는 전월 동기 대비 ${viewsRate.value >= 0 ? '상승' : '하락'}했습니다.`);
+  }
+
+  if (callRate) {
+    messages.push(`연결콜은 ${callRate.value >= 0 ? '증가' : '감소'} 흐름입니다.`);
+  }
+
+  if (reserveRate) {
+    messages.push(`예약 신청은 ${reserveRate.value >= 0 ? '개선' : '감소'}되었습니다.`);
+  }
+
+  if (missRate && missRate.good) {
+    messages.push('미연결콜은 줄어 응대 관리 측면에서 긍정적입니다.');
+  }
+
+  $('weekly-insight').textContent = messages.join(' ') || '이번 주 핵심 지표를 확인해보세요.';
+}
+
+function renderDashboard() {
+  const weekKey = $('sel-week').value;
+  const store = $('sel-store').value;
+  const team = $('sel-team').value;
+  const meta = weekMeta[weekKey];
+
+  if (!meta) return;
+
+  const pmKey = prevMonthKey(meta.yr, meta.mo, meta.wk);
+  const pyKey = prevYearKey(meta.yr, meta.mo, meta.wk);
+
+  const prevMoMeta = pmKey ? weekMeta[pmKey] : null;
+  const prevYrMeta = pyKey ? weekMeta[pyKey] : null;
+
+  const curRows = getRowsByWeekKey(weekKey, store, team);
+  const curSum = sumRows(curRows);
+
+  const prevMoSum = pmKey ? sumRows(getRowsByWeekKey(pmKey, store, team)) : null;
+  const prevYrSum = pyKey ? sumRows(getRowsByWeekKey(pyKey, store, team)) : null;
+
+  const currentIndex = weekKeys.indexOf(weekKey);
+  const trendKeys = weekKeys.slice(Math.max(0, currentIndex - 6), currentIndex + 1);
+
+  lastRenderData = {
+    meta,
+    curSum,
+    prevMoSum,
+    prevYrSum
+  };
+
+  renderPeriodCards(meta, prevMoMeta, prevYrMeta);
+  renderKpiCards(curSum, prevMoSum, prevYrSum, trendKeys, store, team);
+  renderCharts(curSum, prevMoSum, prevYrSum, trendKeys, store, team);
+  renderDetailTable(curRows);
+  renderInsight(curSum, prevMoSum);
+}
+
+function openKpiModal(metricKey) {
+  if (!lastRenderData) return;
+
+  const def = METRIC_DEFS[metricKey];
+  const cur = lastRenderData.curSum;
+  const prevMo = lastRenderData.prevMoSum;
+  const prevYr = lastRenderData.prevYrSum;
+
+  $('modalGroup').textContent = def.group;
+  $('modalTitle').textContent = def.label;
+  $('modalValue').textContent = fmt(cur[metricKey]);
+  $('modalPrevMonth').textContent = prevMo ? fmt(prevMo[metricKey]) : '-';
+  $('modalPrevYear').textContent = prevYr ? fmt(prevYr[metricKey]) : '-';
+
+  const moRate = prevMo ? deltaRate(cur[metricKey], prevMo[metricKey], def.higher) : null;
+  const yrRate = prevYr ? deltaRate(cur[metricKey], prevYr[metricKey], def.higher) : null;
+
+  $('modalPrevMonthRate').innerHTML = moRate
+    ? `<span class="${moRate.good ? 'rate-up' : 'rate-down'}">${moRate.value >= 0 ? '↑' : '↓'} ${Math.abs(moRate.value).toFixed(1)}%</span>`
+    : '<span class="rate-flat">비교 불가</span>';
+
+  $('modalPrevYearRate').innerHTML = yrRate
+    ? `<span class="${yrRate.good ? 'rate-up' : 'rate-down'}">${yrRate.value >= 0 ? '↑' : '↓'} ${Math.abs(yrRate.value).toFixed(1)}%</span>`
+    : '<span class="rate-flat">비교 불가</span>';
+
+  $('modalDesc').textContent = def.desc;
+
+  $('kpiModal').hidden = false;
   document.body.style.overflow = 'hidden';
 }
 
 function closeKpiModal() {
-  const modal = $('kpiModal');
-  if (!modal) return;
-  modal.style.display = 'none';
+  $('kpiModal').hidden = true;
   document.body.style.overflow = '';
 }
 
-function bindKpiCardEvents() {
-  document.querySelectorAll('#kpi-grid .kpi-card').forEach(card => {
-    card.onclick = function () {
-      const title = card.querySelector('.kpi-label')?.textContent?.trim() || '-';
-      const current = card.querySelector('.kpi-value')?.textContent?.trim() || '-';
-      const rows = [...card.querySelectorAll('.kpi-compare-row')];
-      const prevMonth = rows[0]?.querySelector('.compare-val')?.textContent?.trim() || '-';
-      const prevYear = rows[1]?.querySelector('.compare-val')?.textContent?.trim() || '-';
-      const rates = [...card.querySelectorAll('.rate-row .rate-item .rv')];
-      const deltaMonth = rates[0]?.textContent?.trim() || '-';
-      const deltaYear = rates[1]?.textContent?.trim() || '-';
-      openKpiModal({ title, current, prevMonth, prevYear, deltaMonth, deltaYear });
-    };
-  });
-}
+async function loadData(forceFresh = false) {
+  const data = await fetchJsonWithCache(DATA_URL, 'tna_place_dashboard_rows_v3', 5 * 60 * 1000, forceFresh);
+  const rows = normalizeRows(data);
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeKpiModal();
-});
-
-document.addEventListener('click', e => {
-  const modal = $('kpiModal');
-  if (modal && e.target === modal) closeKpiModal();
-});
-
-// ─── 초기화 ─────────────────────────────────────────────────────────────────
-async function init() {
-  showStatus('데이터 불러오는 중...');
-
-  const [placeOk] = await Promise.all([
-    loadFromGoogleSheets(false),
-    loadTnaFromGoogleSheets(false),
-  ]);
+  RAW.length = 0;
+  rows.forEach(row => RAW.push(row));
 
   rebuildMetaFromRaw();
-  initSelects();
-  initMonthlySelects();
-  initTnaSelects();
-
-  if (!placeOk || !RAW.length) {
-    showStatus('구글시트 데이터를 불러오지 못했습니다. Apps Script 배포 URL과 시트 컬럼명을 확인해주세요.', true);
-  }
-
-  applyFilter();
 }
 
-init();
+async function refreshData() {
+  const btn = $('refreshBtn');
+  const originalText = btn.textContent;
+
+  try {
+    btn.disabled = true;
+    btn.textContent = '불러오는 중...';
+
+    await loadData(true);
+    initSelects();
+    renderDashboard();
+
+    $('empty-state').hidden = true;
+  } catch (e) {
+    console.error(e);
+    $('empty-state').hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+async function init() {
+  $('modalCloseBtn').addEventListener('click', closeKpiModal);
+
+  $('kpiModal').addEventListener('click', e => {
+    if (e.target.id === 'kpiModal') closeKpiModal();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeKpiModal();
+  });
+
+  $('refreshBtn').addEventListener('click', refreshData);
+
+  try {
+    await loadData(false);
+
+    if (!RAW.length) {
+      $('empty-state').hidden = false;
+      return;
+    }
+
+    initSelects();
+    renderDashboard();
+    $('empty-state').hidden = true;
+  } catch (e) {
+    console.error(e);
+    $('empty-state').hidden = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
