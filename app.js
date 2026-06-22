@@ -1218,3 +1218,4 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+<script src="./tna-fix.js?v=20260622-header1" defer></script>
