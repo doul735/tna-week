@@ -699,3 +699,11 @@ tr.total-row td {
   .kpi-card { min-height: auto; }
   .modal-value { font-size: 46px; }
 }
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 14px;
+  object-fit: cover;
+  display: block;
+}
