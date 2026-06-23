@@ -1,35 +1,20 @@
-TNA 상단 로고/타이틀 정렬 + 월별 선택 활성/비활성 패치입니다.
+TNA 대시보드 오류 수정본입니다.
 
-수정 범위
-1. 상단 타이틀 왼쪽에 46x46 로고가 붙도록 정렬
-2. 파비콘/OG 이미지는 건드리지 않음
-3. 조회 기준이 주간 조회일 때: 주간 선택 활성, 월별 선택 비활성
-4. 조회 기준이 월별 조회일 때: 월별 선택 활성, 주간 선택 비활성
-5. 기존 차트/KPI/테이블 디자인은 그대로 유지
+수정한 문제
+1. index.html에서 page-shell/header 구조가 깨져 있던 문제 수정
+2. app.js 맨 아래에 들어간 HTML <script> 태그 제거
+3. styles.css 하단에 중복/충돌하던 헤더 보정 CSS 정리
+4. 상단 로고를 제목 왼쪽에 46x46 크기로 정렬
+5. 주간/월별 조회 선택에 따라 주간 선택/월별 선택이 정상적으로 활성·비활성되도록 유지
+6. 캐시 문제를 줄이기 위해 index.html의 app.js/styles.css 버전을 20260623-fix1로 변경
 
-업로드할 파일
-- header-symbol.png
-- tna-fix.css
-- tna-fix.js
-
-GitHub 적용 방법
-1. 이 압축파일 안의 3개 파일을 GitHub 저장소 루트에 업로드하세요.
-   루트는 index.html, app.js, styles.css가 있는 같은 위치입니다.
-
-2. index.html에서 기존 styles.css 아래에 이 한 줄을 추가하세요.
-
-<link rel="stylesheet" href="./tna-fix.css?v=20260622-header1" />
-
-3. index.html에서 기존 app.js 아래에 이 한 줄을 추가하세요.
-
-<script src="./tna-fix.js?v=20260622-header1" defer></script>
+적용 방법
+1. GitHub 저장소에서 기존 index.html, app.js, styles.css를 각각 이 파일들로 교체하세요.
+2. header-symbol.png, favicon.ico, favicon-32x32.ico, apple-touch-icon.ico, og-image.png는 기존 파일 그대로 두세요.
+3. 저장 후 GitHub Pages 반영까지 1~3분 기다리세요.
+4. 사이트에서 Ctrl + Shift + R 또는 Ctrl + F5로 강력 새로고침하세요.
 
 주의
-- favicon.ico, favicon-32x32.png, apple-touch-icon.png는 건드리지 마세요.
-- og-image.png도 그대로 두세요.
-- header-symbol.png만 이번에 업로드한 46x46 로고로 교체됩니다.
-
-적용 후 확인
-- GitHub 저장 후 1~3분 기다리기
-- 사이트에서 Ctrl + F5 강력 새로고침
-- 그래도 이전 화면이면 시크릿 창에서 확인
+- CSS 파일 안에는 <link ...> 태그를 넣으면 안 됩니다.
+- JS 파일 안에는 <script ...> 태그를 넣으면 안 됩니다.
+- index.html에만 <link>와 <script> 태그가 들어갑니다.
