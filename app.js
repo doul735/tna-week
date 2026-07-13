@@ -8,6 +8,8 @@
 // 4) 지표 그룹 구성 설명/수치 보강
 // 5) 예약신청 단독 차트 → 연결콜+예약신청 전환 지표 차트
 // 6) 부정리뷰/톡톡상담 컬럼 밀림 방지
+// 7) 부정리뷰 컬럼명 자동 인식 보강
+// 8) 이번 주 인사이트 상세 분석 모달 연결
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_TCR45muWiseITDdxHo_sYPKYxLS5CgRi_1LCouEgrapDkMQ7VE-HAj8zURoI2Uc/exec';
@@ -174,12 +176,76 @@ function cacheBustUrl(url) {
   return url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
 }
 
+
+function normalizeFieldKey(value) {
+  return String(value || '')
+    .replace(/[\s_\-./()\[\]{}·:：]+/g, '')
+    .toLowerCase();
+}
+
 function pickRaw(row, keys) {
+  if (!row) return undefined;
+
+  // 1차: 원본 컬럼명 그대로 매칭
   for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== null && row[key] !== undefined && row[key] !== '') {
+    if (
+      Object.prototype.hasOwnProperty.call(row, key) &&
+      row[key] !== null &&
+      row[key] !== undefined &&
+      row[key] !== ''
+    ) {
       return row[key];
     }
   }
+
+  // 2차: 공백/언더바/괄호/대소문자 차이를 제거하고 매칭
+  const normalizedMap = {};
+  Object.keys(row).forEach(originalKey => {
+    const cleanKey = normalizeFieldKey(originalKey);
+    if (!normalizedMap[cleanKey]) normalizedMap[cleanKey] = originalKey;
+  });
+
+  for (const key of keys) {
+    const cleanKey = normalizeFieldKey(key);
+    const originalKey = normalizedMap[cleanKey];
+
+    if (
+      originalKey &&
+      row[originalKey] !== null &&
+      row[originalKey] !== undefined &&
+      row[originalKey] !== ''
+    ) {
+      return row[originalKey];
+    }
+  }
+
+  // 3차: 부정리뷰처럼 시트마다 이름이 조금씩 다른 컬럼 보강
+  const wantsNegativeReview = keys.some(key => {
+    const cleanKey = normalizeFieldKey(key);
+    return cleanKey.includes('부정') || cleanKey.includes('negative') || cleanKey.includes('badreview');
+  });
+
+  if (wantsNegativeReview) {
+    const foundKey = Object.keys(row).find(originalKey => {
+      const cleanKey = normalizeFieldKey(originalKey);
+      return (
+        (cleanKey.includes('부정') && cleanKey.includes('리뷰')) ||
+        cleanKey.includes('negative') ||
+        cleanKey.includes('negreview') ||
+        cleanKey.includes('badreview')
+      );
+    });
+
+    if (
+      foundKey &&
+      row[foundKey] !== null &&
+      row[foundKey] !== undefined &&
+      row[foundKey] !== ''
+    ) {
+      return row[foundKey];
+    }
+  }
+
   return undefined;
 }
 
@@ -245,26 +311,44 @@ function rowsFromPayload(data) {
 }
 
 function normalizePlaceRow(r) {
-  const negReviewValue = pickRaw(r, ['부정리뷰', '부정 리뷰', 'negative_review', 'neg_review']);
+  const negReviewValue = pickRaw(r, [
+    '부정리뷰',
+    '부정 리뷰',
+    '부정리뷰수',
+    '부정 리뷰수',
+    '부정리뷰 감지',
+    '부정 리뷰 감지',
+    '부정리뷰관리',
+    '부정 리뷰 관리',
+    '부정',
+    'negative_review',
+    'negativeReview',
+    'negative_reviews',
+    'negativeReviews',
+    'neg_review',
+    'negReview',
+    'bad_review',
+    'badReview'
+  ]);
 
   return {
     yr: num(pickRaw(r, ['년', 'yr', 'year'])),
     mo: num(pickRaw(r, ['월', 'mo', 'month'])),
     wk: num(pickRaw(r, ['주', '주차', 'wk', 'week'])),
-    start: dateText(pickRaw(r, ['시작일(월)', '시작일', 'start', 'start_date'])),
-    end: dateText(pickRaw(r, ['종료일(일)', '종료일', 'end', 'end_date'])),
-    store: text(pickRaw(r, ['매장명', 'store', 'store_name'])),
+    start: dateText(pickRaw(r, ['시작일(월)', '시작일', 'start', 'start_date', 'startDate'])),
+    end: dateText(pickRaw(r, ['종료일(일)', '종료일', 'end', 'end_date', 'endDate'])),
+    store: text(pickRaw(r, ['매장명', '매장', 'store', 'store_name', 'storeName'])),
     team: text(pickRaw(r, ['팀', 'team'])),
-    views: num(pickRaw(r, ['조회수', '플레이스 조회수', 'views'])),
-    conn: num(pickRaw(r, ['연결콜', '연결 콜', 'conn', 'connected_call'])),
-    miss: num(pickRaw(r, ['미연결콜', '미연결 콜', 'miss', 'missed_call'])),
-    res_in: num(pickRaw(r, ['예약유입', '예약 유입', 'res_in', 'resIn', 'reservation_in'])),
-    res_req: num(pickRaw(r, ['예약신청', '예약 신청', 'res_req', 'resReq', 'reservation_request'])),
-    review: num(pickRaw(r, ['리뷰', 'review'])),
-    // 부정리뷰는 명시적인 부정리뷰 컬럼이 있을 때만 사용합니다.
-    // 원본에 부정리뷰 컬럼이 없으면 0으로 두어 톡톡상담 값이 밀려 들어가지 않게 합니다.
+    views: num(pickRaw(r, ['조회수', '플레이스 조회수', 'views', 'place_views', 'placeViews'])),
+    conn: num(pickRaw(r, ['연결콜', '연결 콜', 'conn', 'connected_call', 'connectedCall'])),
+    miss: num(pickRaw(r, ['미연결콜', '미연결 콜', 'miss', 'missed_call', 'missedCall'])),
+    res_in: num(pickRaw(r, ['예약유입', '예약 유입', 'res_in', 'resIn', 'reservation_in', 'reservationIn'])),
+    res_req: num(pickRaw(r, ['예약신청', '예약 신청', 'res_req', 'resReq', 'reservation_request', 'reservationRequest'])),
+    review: num(pickRaw(r, ['리뷰', '리뷰수', 'review', 'reviews'])),
+    // 부정리뷰는 명시적인 부정리뷰 계열 컬럼이 있을 때만 사용합니다.
+    // 컬럼명이 조금 달라도 자동으로 찾아오되, 일반 리뷰/톡톡상담 값이 밀려 들어가지 않게 합니다.
     neg_review: negReviewValue === undefined ? 0 : num(negReviewValue),
-    chat: num(pickRaw(r, ['톡톡상담', '톡톡 상담', '톡톡', '톡톡상담수', '네이버톡톡', 'chat', 'talk', 'naver_talk']))
+    chat: num(pickRaw(r, ['톡톡상담', '톡톡 상담', '톡톡', '톡톡상담수', '네이버톡톡', 'chat', 'talk', 'talktalk', 'talkTalk', 'naver_talk']))
   };
 }
 
@@ -275,7 +359,7 @@ function normalizeRows(data) {
 }
 
 async function loadData(forceFresh = false) {
-  const data = await fetchJsonWithCache(DATA_URL, 'tna_place_dashboard_rows_v2_20260622', 5 * 60 * 1000, forceFresh);
+  const data = await fetchJsonWithCache(DATA_URL, 'tna_place_dashboard_rows_v4_20260713_neg_review_insight', 5 * 60 * 1000, forceFresh);
   const rows = normalizeRows(data);
 
   RAW.length = 0;
@@ -1082,6 +1166,191 @@ function closeKpiModal() {
   document.body.style.overflow = '';
 }
 
+function ensureInsightModal() {
+  if ($('insightModal')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'insightModal';
+  modal.className = 'insight-modal';
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="insight-modal-card" role="dialog" aria-modal="true" aria-labelledby="insightModalTitle">
+      <button type="button" class="insight-modal-close" id="insightModalClose" aria-label="닫기">×</button>
+      <p class="modal-eyebrow">이번 주 상세 분석</p>
+      <h2 id="insightModalTitle">주간 성과 상세 요약</h2>
+      <div class="insight-detail-box" id="insightDetailContent"></div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .insight-modal[hidden] { display: none !important; }
+    .insight-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(2, 6, 12, .72);
+      backdrop-filter: blur(8px);
+    }
+    .insight-modal-card {
+      position: relative;
+      width: min(760px, 94vw);
+      max-height: 86vh;
+      overflow: auto;
+      border: 1px solid rgba(255, 122, 0, .45);
+      border-radius: 26px;
+      padding: 32px;
+      background:
+        radial-gradient(circle at top right, rgba(255, 122, 0, .18), transparent 36%),
+        linear-gradient(135deg, rgba(15, 32, 46, .98), rgba(14, 21, 30, .98));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .55);
+      color: #f8fafc;
+    }
+    .insight-modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .25);
+      background: rgba(255, 255, 255, .08);
+      color: #fff;
+      font-size: 27px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .insight-detail-box {
+      margin-top: 22px;
+      display: grid;
+      gap: 14px;
+    }
+    .insight-detail-card {
+      border: 1px solid rgba(148, 163, 184, .2);
+      border-radius: 16px;
+      padding: 16px 18px;
+      background: rgba(15, 23, 42, .48);
+    }
+    .insight-detail-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 17px;
+      color: #fff;
+    }
+    .insight-detail-card p {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+    .insight-detail-card .good { color: #32d583; font-weight: 950; }
+    .insight-detail-card .bad { color: #fb7185; font-weight: 950; }
+    .insight-detail-card .flat { color: #94a3b8; font-weight: 950; }
+  `;
+  document.head.appendChild(style);
+
+  $('insightModalClose')?.addEventListener('click', closeInsightModal);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) closeInsightModal();
+  });
+}
+
+function insightRateText(current, previous, higher) {
+  const prev = num(previous);
+  if (!prev) return { text: '비교 데이터 없음', cls: 'flat' };
+
+  const rate = ((num(current) - prev) / prev) * 100;
+  const good = higher ? rate >= 0 : rate <= 0;
+  const direction = rate > 0 ? '증가' : rate < 0 ? '감소' : '변동 없음';
+
+  return {
+    text: `${direction} ${Math.abs(rate).toFixed(1)}%`,
+    cls: good ? 'good' : 'bad'
+  };
+}
+
+function buildInsightDetailHtml() {
+  if (!lastRenderData) {
+    return `
+      <div class="insight-detail-card">
+        <strong>데이터 없음</strong>
+        <p>아직 선택된 데이터가 없습니다. 최신 조회를 눌러 데이터를 먼저 불러와 주세요.</p>
+      </div>
+    `;
+  }
+
+  const cur = lastRenderData.curSum || {};
+  const prevMo = lastRenderData.prevMoSum || {};
+  const prevYr = lastRenderData.prevYrSum || {};
+  const modeText = lastRenderData.mode === 'MONTH' ? '선택 월' : '이번 주';
+
+  return METRICS.map(key => {
+    const def = METRIC_DEFS[key];
+    const current = num(cur[key]);
+    const pm = num(prevMo[key]);
+    const py = num(prevYr[key]);
+    const monthRate = insightRateText(current, pm, def.higher);
+    const yearRate = insightRateText(current, py, def.higher);
+
+    return `
+      <div class="insight-detail-card">
+        <strong>${def.label} ${fmt(current)}</strong>
+        <p>
+          ${modeText} ${def.label}은 전월 동기 ${fmt(pm)} 대비
+          <span class="${monthRate.cls}">${monthRate.text}</span>,
+          전년 동기 ${fmt(py)} 대비
+          <span class="${yearRate.cls}">${yearRate.text}</span>입니다.
+          ${def.desc}
+        </p>
+      </div>
+    `;
+  }).join('');
+}
+
+function openInsightModal() {
+  ensureInsightModal();
+  const content = $('insightDetailContent');
+  if (content) content.innerHTML = buildInsightDetailHtml();
+
+  const modal = $('insightModal');
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeInsightModal() {
+  const modal = $('insightModal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function bindInsightEvents() {
+  const insightPanel = document.querySelector('.insight-panel');
+  if (!insightPanel || insightPanel.dataset.boundInsight === 'true') return;
+
+  insightPanel.dataset.boundInsight = 'true';
+  insightPanel.style.cursor = 'pointer';
+  insightPanel.addEventListener('click', e => {
+    const clickedButton = e.target.closest('button');
+    const clickedPanel = e.target.closest('.insight-panel');
+    if (clickedButton || clickedPanel) {
+      e.preventDefault();
+      openInsightModal();
+    }
+  });
+}
+
+window.openInsightModal = openInsightModal;
+window.closeInsightModal = closeInsightModal;
+
+
 window.openKpiModal = openKpiModal;
 window.closeKpiModal = closeKpiModal;
 
@@ -1187,12 +1456,16 @@ function bindModalEvents() {
   }
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeKpiModal();
+    if (e.key === 'Escape') {
+      closeKpiModal();
+      closeInsightModal();
+    }
   });
 }
 
 async function init() {
   bindModalEvents();
+  bindInsightEvents();
   fillMetricSelects();
 
   const refreshBtn = $('refreshBtn');
@@ -1216,5 +1489,19 @@ async function init() {
     if ($('empty-state')) $('empty-state').hidden = false;
   }
 }
+
+
+window.debugTnaColumns = function () {
+  const first = RAW[0] || null;
+  console.log('RAW length:', RAW.length);
+  console.log('첫 번째 정규화 데이터:', first);
+  console.table(RAW.slice(0, 5).map(row => ({
+    매장명: row.store,
+    주차: `${row.yr}-${row.mo}-${row.wk}`,
+    리뷰: row.review,
+    부정리뷰: row.neg_review,
+    톡톡상담: row.chat
+  })));
+};
 
 document.addEventListener('DOMContentLoaded', init);
