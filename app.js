@@ -13,6 +13,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DATA_URL = 'https://script.google.com/macros/s/AKfycbw_TCR45muWiseITDdxHo_sYPKYxLS5CgRi_1LCouEgrapDkMQ7VE-HAj8zURoI2Uc/exec';
+
+const REPORT_PIN = '0517';
+const PIN_SESSION_KEY = 'tna_report_pin_authenticated';
+
+let reportInitialized = false;
 const RAW = [];
 
 let weekMeta = {};
@@ -1504,4 +1509,99 @@ window.debugTnaColumns = function () {
   })));
 };
 
-document.addEventListener('DOMContentLoaded', init);
+async function openReport() {
+  const pinGate = $('pinGate');
+  const reportApp = $('reportApp');
+
+  if (pinGate) {
+    pinGate.hidden = true;
+  }
+
+  if (reportApp) {
+    reportApp.hidden = false;
+  }
+
+  document.body.classList.remove('pin-locked');
+
+  if (!reportInitialized) {
+    reportInitialized = true;
+    await init();
+  }
+}
+
+function initPinGate() {
+  const pinGate = $('pinGate');
+  const reportApp = $('reportApp');
+  const pinForm = $('pinForm');
+  const pinInput = $('pinInput');
+  const pinError = $('pinError');
+
+  /*
+   * PIN 화면이 없는 경우를 대비한 안전장치
+   */
+  if (!pinGate || !reportApp || !pinForm || !pinInput) {
+    init();
+    return;
+  }
+
+  document.body.classList.add('pin-locked');
+  reportApp.hidden = true;
+  pinGate.hidden = false;
+
+  /*
+   * 같은 브라우저 탭에서 이미 인증한 경우
+   * 새로고침해도 다시 묻지 않습니다.
+   */
+  if (sessionStorage.getItem(PIN_SESSION_KEY) === 'true') {
+    openReport();
+    return;
+  }
+
+  /*
+   * 숫자만 최대 4자리 입력 가능
+   */
+  pinInput.addEventListener('input', () => {
+    pinInput.value = pinInput.value
+      .replace(/\D/g, '')
+      .slice(0, 4);
+
+    pinInput.classList.remove('is-error');
+
+    if (pinError) {
+      pinError.hidden = true;
+    }
+  });
+
+  pinForm.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    if (pinInput.value !== REPORT_PIN) {
+      pinInput.value = '';
+      pinInput.classList.add('is-error');
+
+      if (pinError) {
+        pinError.hidden = false;
+      }
+
+      pinInput.focus();
+      return;
+    }
+
+    sessionStorage.setItem(PIN_SESSION_KEY, 'true');
+
+    await openReport();
+  });
+
+  pinInput.focus();
+}
+
+/*
+ * 테스트나 로그아웃이 필요할 때 개발자 도구에서
+ * logoutTnaReport()를 실행하면 PIN 인증이 초기화됩니다.
+ */
+window.logoutTnaReport = function () {
+  sessionStorage.removeItem(PIN_SESSION_KEY);
+  window.location.reload();
+};
+
+document.addEventListener('DOMContentLoaded', initPinGate);
