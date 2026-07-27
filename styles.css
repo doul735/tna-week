@@ -784,3 +784,17 @@ tr.total-row td {
     width: 100%;
   }
 }
+/* PIN 화면 로고 뒤 네모 배경 제거 */
+.pin-card .pin-logo {
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+.pin-card .pin-logo img {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
