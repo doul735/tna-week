@@ -1111,3 +1111,33 @@ body {
   border-color: rgba(255, 122, 0, 0.7);
   box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.12);
 }
+/* PIN 화면 그라데이션 제거 */
+.pin-gate {
+  background: #061018 !important;
+  background-image: none !important;
+}
+
+.pin-card {
+  background: #101e2b !important;
+  background-image: none !important;
+
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.pin-card input {
+  background: #091522 !important;
+  background-image: none !important;
+}
+
+.pin-card button {
+  background: #ff8615 !important;
+  background-image: none !important;
+}
+
+.pin-card button:hover {
+  background: #ff9424 !important;
+}
