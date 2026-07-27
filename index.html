@@ -5,36 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>네이버 플레이스 직영점 주간보고서</title>
-  <meta name="description" content="티스테이션 직영점 네이버 플레이스 주요 성과 주간보고서" />
+  <meta
+    name="description"
+    content="티스테이션 직영점 네이버 플레이스 주요 성과 주간보고서"
+  />
 
   <link rel="icon" href="./favicon.ico" />
-  <link rel="icon" type="image/x-icon" sizes="32x32" href="./favicon-32x32.ico" />
+  <link
+    rel="icon"
+    type="image/x-icon"
+    sizes="32x32"
+    href="./favicon-32x32.ico"
+  />
   <link rel="apple-touch-icon" href="./apple-touch-icon.ico" />
 
-  <meta property="og:title" content="네이버 플레이스 직영점 주간보고서" />
-  <meta property="og:description" content="조회수, 연결콜, 예약, 리뷰 성과를 한눈에 확인하는 주간 리포트" />
-  <meta property="og:image" content="https://tna-report.pllet.com/og-image-v2.png" />
+  <meta
+    property="og:title"
+    content="네이버 플레이스 직영점 주간보고서"
+  />
+  <meta
+    property="og:description"
+    content="조회수, 연결콜, 예약, 리뷰 성과를 한눈에 확인하는 주간 리포트"
+  />
+  <meta
+    property="og:image"
+    content="https://tna-report.pllet.com/og-image-v2.png"
+  />
   <meta property="og:url" content="https://tna-report.pllet.com" />
   <meta property="og:type" content="website" />
 
-  <link rel="stylesheet" href="./styles.css?v=20260727-pin6" />
+  <link rel="stylesheet" href="./styles.css?v=20260727-pin7" />
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="./app.js?v=20260727-pin1" defer></script>
+  <script src="./app.js?v=20260727-pin7" defer></script>
 </head>
 
-<body>
-  <div class="page-shell">
-    <body class="pin-locked">
+<body class="pin-locked">
 
   <!-- 4자리 PIN 입력 화면 -->
   <section class="pin-gate" id="pinGate">
     <form class="pin-card" id="pinForm">
-     <div class="pin-logo">
-  <img src="./header-symbol.png" alt="티스테이션 로고" />
-</div>
+
+      <div class="pin-logo">
+        <img
+          src="./header-symbol.png?v=20260727-logo2"
+          alt="티스테이션 로고"
+        />
+      </div>
 
       <p class="pin-eyebrow">도울기획 · 네이버 플레이스</p>
+
       <h1>티스테이션 직영점 주간보고서</h1>
 
       <p class="pin-guide">
@@ -51,7 +72,7 @@
         maxlength="4"
         autocomplete="off"
         placeholder="••••"
-        aria-label="0517"
+        aria-label="4자리 PIN 번호"
         autofocus
       />
 
@@ -65,10 +86,14 @@
 
   <!-- 기존 보고서 화면 -->
   <div class="page-shell" id="reportApp" hidden>
+
     <header class="report-header">
       <div class="brand-area">
         <div class="brand-symbol image-logo">
-          <img src="./header-symbol.png" alt="T 로고" />
+          <img
+            src="./header-symbol.png?v=20260727-logo2"
+            alt="T 로고"
+          />
         </div>
 
         <div class="brand-text">
@@ -78,14 +103,24 @@
       </div>
 
       <div class="header-actions">
-        <button class="download-btn" id="downloadRawBtn" type="button">Raw데이터 엑셀 내려받기</button>
-        <div class="header-period" id="header-period">데이터 불러오는 중...</div>
+        <button
+          class="download-btn"
+          id="downloadRawBtn"
+          type="button"
+        >
+          Raw데이터 엑셀 내려받기
+        </button>
+
+        <div class="header-period" id="header-period">
+          데이터 불러오는 중...
+        </div>
       </div>
     </header>
 
     <section class="filter-panel" aria-label="보고서 조회 조건">
       <div class="filter-item mode-item">
         <label for="sel-period-mode">조회 기준</label>
+
         <select id="sel-period-mode">
           <option value="WEEK">주간 조회 · 월~일 1주</option>
           <option value="MONTH">월별 조회 · 선택 월 전체</option>
@@ -114,12 +149,19 @@
         <p class="filter-help">해당 월 전체 주차 합산</p>
       </div>
 
-      <button class="refresh-btn" id="refreshBtn" type="button">최신 조회</button>
+      <button
+        class="refresh-btn"
+        id="refreshBtn"
+        type="button"
+      >
+        최신 조회
+      </button>
     </section>
 
     <section class="period-grid">
       <article class="period-card current">
         <span class="dot"></span>
+
         <div>
           <strong id="period-current-title">선택 기준</strong>
           <p id="period-current">-</p>
@@ -128,6 +170,7 @@
 
       <article class="period-card prev-month">
         <span class="dot"></span>
+
         <div>
           <strong id="period-prev-month-title">전월 동기</strong>
           <p id="period-prev-month">-</p>
@@ -136,6 +179,7 @@
 
       <article class="period-card prev-year">
         <span class="dot"></span>
+
         <div>
           <strong id="period-prev-year-title">전년 동기</strong>
           <p id="period-prev-year">-</p>
@@ -143,17 +187,29 @@
       </article>
     </section>
 
-    <section class="kpi-grid" id="kpi-grid" aria-label="주요 KPI 카드"></section>
+    <section
+      class="kpi-grid"
+      id="kpi-grid"
+      aria-label="주요 KPI 카드"
+    ></section>
 
     <main class="dashboard-chart-grid">
+
       <section class="panel chart-wide trend-card">
         <div class="panel-header">
           <div>
             <h2 id="trendChartTitle">주차별 지표 추이</h2>
-            <p class="panel-subtitle">선택한 지표의 최근 흐름을 숫자와 함께 확인합니다.</p>
+            <p class="panel-subtitle">
+              선택한 지표의 최근 흐름을 숫자와 함께 확인합니다.
+            </p>
           </div>
-          <select id="trendMetricSelect" aria-label="추이 차트 지표 선택"></select>
+
+          <select
+            id="trendMetricSelect"
+            aria-label="추이 차트 지표 선택"
+          ></select>
         </div>
+
         <div class="chart-box tall">
           <canvas id="chart-trend"></canvas>
         </div>
@@ -163,17 +219,35 @@
         <div class="panel-header">
           <div>
             <h2>지표 그룹 구성</h2>
-            <p class="panel-subtitle">노출 · 전환 · 관리 항목을 구분해서 보여줍니다.</p>
+            <p class="panel-subtitle">
+              노출 · 전환 · 관리 항목을 구분해서 보여줍니다.
+            </p>
           </div>
         </div>
+
         <div class="donut-layout">
           <div class="chart-box donut">
             <canvas id="chart-groups"></canvas>
           </div>
+
           <div class="group-legend" id="group-summary">
-            <div><span class="legend-dot orange"></span><b>노출 관련 지표</b><p>조회수 · 예약유입</p></div>
-            <div><span class="legend-dot blue"></span><b>전환 관련 지표</b><p>연결콜 · 예약신청</p></div>
-            <div><span class="legend-dot green"></span><b>관리 관련 지표</b><p>미연결콜 · 리뷰 · 부정리뷰 · 톡톡상담</p></div>
+            <div>
+              <span class="legend-dot orange"></span>
+              <b>노출 관련 지표</b>
+              <p>조회수 · 예약유입</p>
+            </div>
+
+            <div>
+              <span class="legend-dot blue"></span>
+              <b>전환 관련 지표</b>
+              <p>연결콜 · 예약신청</p>
+            </div>
+
+            <div>
+              <span class="legend-dot green"></span>
+              <b>관리 관련 지표</b>
+              <p>미연결콜 · 리뷰 · 부정리뷰 · 톡톡상담</p>
+            </div>
           </div>
         </div>
       </section>
@@ -182,9 +256,12 @@
         <div class="panel-header">
           <div>
             <h2 id="conversionChartTitle">전환 지표 추이</h2>
-            <p class="panel-subtitle">예약신청만 따로 보지 않고 연결콜과 함께 비교합니다.</p>
+            <p class="panel-subtitle">
+              예약신청만 따로 보지 않고 연결콜과 함께 비교합니다.
+            </p>
           </div>
         </div>
+
         <div class="chart-box tall">
           <canvas id="chart-reservation"></canvas>
         </div>
@@ -194,14 +271,22 @@
         <div class="panel-header">
           <div>
             <h2>전월 / 전년 동기 비교</h2>
-            <p class="panel-subtitle">선택 지표의 현재 · 전월 · 전년 값을 비교합니다.</p>
+            <p class="panel-subtitle">
+              선택 지표의 현재 · 전월 · 전년 값을 비교합니다.
+            </p>
           </div>
-          <select id="compareMetricSelect" aria-label="비교 차트 지표 선택"></select>
+
+          <select
+            id="compareMetricSelect"
+            aria-label="비교 차트 지표 선택"
+          ></select>
         </div>
+
         <div class="chart-box tall">
           <canvas id="chart-compare"></canvas>
         </div>
       </section>
+
     </main>
 
     <section class="insight-panel">
@@ -209,8 +294,15 @@
         <span>💡</span>
         <strong>이번 주 인사이트</strong>
       </div>
-      <p id="weekly-insight">데이터를 불러오면 이번 주 핵심 변화가 자동으로 표시됩니다.</p>
-      <button type="button" onclick="document.querySelector('.dashboard-chart-grid')?.scrollIntoView({behavior:'smooth'})">
+
+      <p id="weekly-insight">
+        데이터를 불러오면 이번 주 핵심 변화가 자동으로 표시됩니다.
+      </p>
+
+      <button
+        type="button"
+        onclick="document.querySelector('.dashboard-chart-grid')?.scrollIntoView({behavior:'smooth'})"
+      >
         상세 분석 보기
         <span>›</span>
       </button>
@@ -220,7 +312,10 @@
       <div class="panel-header">
         <div>
           <h2>매장별 상세 데이터</h2>
-          <p class="panel-subtitle" id="table-caption">선택한 조회 기준에 맞춰 매장별 합산 데이터가 표시됩니다.</p>
+
+          <p class="panel-subtitle" id="table-caption">
+            선택한 조회 기준에 맞춰 매장별 합산 데이터가 표시됩니다.
+          </p>
         </div>
       </div>
 
@@ -240,6 +335,7 @@
               <th>톡톡상담</th>
             </tr>
           </thead>
+
           <tbody id="detail-tbody"></tbody>
         </table>
       </div>
@@ -248,11 +344,25 @@
     <div class="empty-state" id="empty-state" hidden>
       데이터를 불러오지 못했습니다. Apps Script 웹앱 URL 또는 배포 권한을 확인해주세요.
     </div>
+
   </div>
 
   <div class="kpi-modal" id="kpiModal" hidden>
-    <div class="kpi-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="kpi-modal-close" type="button" id="modalCloseBtn" aria-label="닫기">×</button>
+    <div
+      class="kpi-modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+    >
+      <button
+        class="kpi-modal-close"
+        type="button"
+        id="modalCloseBtn"
+        aria-label="닫기"
+      >
+        ×
+      </button>
+
       <p class="modal-eyebrow" id="modalGroup">지표 상세</p>
       <h2 id="modalTitle">-</h2>
       <div class="modal-value" id="modalValue">-</div>
@@ -263,6 +373,7 @@
           <strong id="modalPrevMonth">-</strong>
           <p id="modalPrevMonthRate">-</p>
         </div>
+
         <div>
           <span>전년 동기</span>
           <strong id="modalPrevYear">-</strong>
@@ -273,5 +384,6 @@
       <p class="modal-desc" id="modalDesc">-</p>
     </div>
   </div>
+
 </body>
 </html>
