@@ -1160,3 +1160,46 @@ body {
   background-color: #061018 !important;
   background-image: none !important;
 }
+/* =========================================================
+   내부 전체 배경 + 상세 모달 주황 그라데이션 제거
+========================================================= */
+
+/* 보고서 바깥 전체 배경을 네이비 단색으로 */
+html,
+body,
+body.pin-locked,
+#reportApp {
+  background: #061018 !important;
+  background-color: #061018 !important;
+  background-image: none !important;
+}
+
+/* 지표 클릭 시 열리는 어두운 뒷배경 */
+.kpi-modal {
+  background: rgba(2, 6, 12, 0.82) !important;
+  background-image: none !important;
+}
+
+/* 클릭해서 열리는 상세 카드 */
+.kpi-modal-card {
+  background: #101e2b !important;
+  background-color: #101e2b !important;
+  background-image: none !important;
+
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* 상세 카드 내부 비교 박스 */
+.kpi-modal-card .modal-stats > div {
+  background: #0b1722 !important;
+  background-color: #0b1722 !important;
+  background-image: none !important;
+}
+
+/* 가상 장식이 있을 경우 제거 */
+.kpi-modal-card::before,
+.kpi-modal-card::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
