@@ -1141,3 +1141,8 @@ body {
 .pin-card button:hover {
   background: #ff9424 !important;
 }
+/* PIN 입력 화면 배경 그라데이션만 제거 */
+body.pin-locked .pin-gate {
+  background: #061018 !important;
+  background-image: none !important;
+}
