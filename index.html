@@ -25,6 +25,44 @@
 
 <body>
   <div class="page-shell">
+    <body class="pin-locked">
+
+  <!-- 4자리 PIN 입력 화면 -->
+  <section class="pin-gate" id="pinGate">
+    <form class="pin-card" id="pinForm">
+      <div class="pin-logo">T</div>
+
+      <p class="pin-eyebrow">T’STATION DIRECT REPORT</p>
+      <h1>직영점 주간보고서</h1>
+
+      <p class="pin-guide">
+        보고서를 확인하려면<br />
+        4자리 PIN 번호를 입력해주세요.
+      </p>
+
+      <input
+        type="password"
+        id="pinInput"
+        name="pin"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="4"
+        autocomplete="off"
+        placeholder="••••"
+        aria-label="0517"
+        autofocus
+      />
+
+      <p class="pin-error" id="pinError" role="alert" hidden>
+        PIN 번호가 올바르지 않습니다.
+      </p>
+
+      <button type="submit">보고서 확인</button>
+    </form>
+  </section>
+
+  <!-- 기존 보고서 화면 -->
+  <div class="page-shell" id="reportApp" hidden>
     <header class="report-header">
       <div class="brand-area">
         <div class="brand-symbol image-logo">
