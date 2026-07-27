@@ -1146,3 +1146,17 @@ body.pin-locked .pin-gate {
   background: #061018 !important;
   background-image: none !important;
 }
+/* 전체 페이지 배경 그라데이션 제거 */
+html,
+body {
+  background: #061018 !important;
+  background-color: #061018 !important;
+  background-image: none !important;
+}
+
+/* 보고서 내부 바깥 배경도 단색으로 고정 */
+#reportApp {
+  background: #061018 !important;
+  background-color: #061018 !important;
+  background-image: none !important;
+}
