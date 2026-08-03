@@ -472,12 +472,29 @@ function getMonthMeta(monthKey) {
 function prevMonthKeyForWeek(yr, mo, wk) {
   let pmo = mo - 1;
   let pyr = yr;
+
   if (pmo < 1) {
     pmo = 12;
     pyr -= 1;
   }
-  const key = `${pyr}-${pmo}-${wk}`;
-  return weekMeta[key] ? key : null;
+
+  // 1순위: 전월의 같은 주차
+  const sameWeekKey = `${pyr}-${pmo}-${wk}`;
+  if (weekMeta[sameWeekKey]) {
+    return sameWeekKey;
+  }
+
+  // 2순위: 같은 주차가 없으면 전월의 직전 주차부터 확인
+  // 예: 현재 5주차인데 전월 5주차가 없으면 전월 4주차 사용
+  for (let fallbackWeek = wk - 1; fallbackWeek >= 1; fallbackWeek -= 1) {
+    const fallbackKey = `${pyr}-${pmo}-${fallbackWeek}`;
+
+    if (weekMeta[fallbackKey]) {
+      return fallbackKey;
+    }
+  }
+
+  return null;
 }
 
 function prevYearKeyForWeek(yr, mo, wk) {
